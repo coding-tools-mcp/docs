@@ -1,10 +1,10 @@
-# Codex Tool Runtime MCP Profile v0.1
+# Coding Tools MCP Profile v0.1
 
 Status: draft contract for implementation and compliance tests.
 
 Protocol target: MCP `2025-06-18`.
 
-This profile defines a coding-agent runtime MCP server. It exposes local coding primitives only: file inspection, search, patch editing, command execution, interactive process stdin, git status/diff, permission requests, and optional image viewing. It is not a Codex product wrapper and must not expose account, memory, web search, model routing, plugin marketplace, cloud task, or subagent orchestration tools.
+This profile defines a coding-agent runtime MCP server. It exposes local coding primitives only: file inspection, search, patch editing, command execution, interactive process stdin, git status/diff, permission requests, and optional image viewing. It is not a product-agent wrapper and must not expose account, memory, web search, model routing, plugin marketplace, cloud task, or subagent orchestration tools.
 
 ## Normative References
 
@@ -37,6 +37,9 @@ P1 transport is stdio.
 
 The server must support `initialize`, `notifications/initialized`, `ping`, `tools/list`, and `tools/call`.
 
+If a client requests a newer date-based protocol revision, the server negotiates down by returning its supported
+`2025-06-18` protocol version in the `initialize` result. Older protocol revisions are rejected.
+
 `initialize` response:
 
 ```json
@@ -49,11 +52,11 @@ The server must support `initialize`, `notifications/initialized`, `ping`, `tool
     "logging": {}
   },
   "serverInfo": {
-    "name": "codex-tool-runtime-mcp",
-    "title": "Codex Tool Runtime MCP",
+    "name": "coding-tools-mcp",
+    "title": "Coding Tools MCP",
     "version": "0.1.3"
   },
-  "instructions": "Use these tools only for local coding runtime operations inside the configured workspace."
+  "instructions": "Use these tools only for local coding operations inside the configured workspace."
 }
 ```
 
@@ -61,7 +64,7 @@ The server must not advertise `prompts`, `resources`, `sampling`, or product-lev
 
 ## Workspace Rules
 
-- The server is started with exactly one workspace root, by `--workspace <path>` or `CODEX_TOOL_RUNTIME_WORKSPACE`.
+- The server is started with exactly one workspace root, by `--workspace <path>` or `CODING_TOOLS_MCP_WORKSPACE`.
 - Tool path inputs are workspace-relative POSIX-style paths.
 - Absolute paths are rejected by default.
 - `..` traversal is rejected before and after canonicalization.
@@ -158,6 +161,7 @@ Shared error object:
             "COMMAND_REJECTED",
             "PERMISSION_REQUIRED",
             "PERMISSION_DENIED",
+            "SANDBOX_UNAVAILABLE",
             "ELICITATION_UNSUPPORTED",
             "PATCH_FAILED",
             "GIT_ERROR",
@@ -214,15 +218,15 @@ P1 tool:
 
 Forbidden tools and equivalent aliases:
 
-- Codex memory or user personalization
-- ChatGPT, Codex, or provider login/account/token/keyring management
-- Codex cloud tasks or remote queues
+- External agent memory or user personalization
+- External provider login/account/token/keyring management
+- External agent cloud tasks or remote queues
 - web search or arbitrary network fetch as a direct tool
 - image generation
 - subagent orchestration
 - model selection or paid account routing
 - plugin marketplace or connector installation
-- high-level `codex(prompt)` or `codex-reply` wrappers
+- high-level prompt wrapper tools
 
 Compliance tests must assert these forbidden capabilities are absent from `tools/list`.
 
@@ -296,8 +300,13 @@ Output schema:
     "start_line": { "type": "integer" },
     "end_line": { "type": "integer" },
     "total_lines": { "type": "integer" },
+    "total_bytes": { "type": "integer" },
     "bytes_read": { "type": "integer" },
     "truncated": { "type": "boolean" },
+    "truncated_by": { "type": ["string", "null"], "enum": ["lines", "bytes", null] },
+    "output_lines": { "type": "integer" },
+    "output_bytes": { "type": "integer" },
+    "next_start_line": { "type": ["integer", "null"] },
     "warnings": { "type": "array", "items": { "type": "string" } },
     "error": { "$ref": "#/$defs/tool_error" }
   },
@@ -533,7 +542,7 @@ Search must skip binary files and default excluded directories.
 
 ### apply_patch
 
-Description: Apply a Codex-style patch envelope inside the workspace.
+Description: Apply a patch envelope inside the workspace.
 
 Annotations:
 
@@ -618,7 +627,7 @@ Output schema:
 
 ### exec_command
 
-Description: Run a command in the workspace under sandbox and permission policy.
+Description: Run a command in the workspace under permission policy. Linux Landlock filesystem confinement is applied when available; otherwise the result includes a warning and the command runs with policy checks only.
 
 Annotations:
 
@@ -673,10 +682,6 @@ Input schema:
       "type": "object",
       "additionalProperties": { "type": "string" },
       "default": {}
-    },
-    "permission_grant_id": {
-      "type": "string",
-      "description": "Grant returned by request_permissions for this exact command class."
     }
   },
   "required": ["cmd"],
@@ -715,7 +720,9 @@ Policy requirements:
 
 - `workdir` must remain inside the workspace.
 - Commands with network access, broad filesystem destruction, privilege changes, or sensitive environment access must be rejected or return `PERMISSION_REQUIRED`.
+- Inline interpreter and shell snippets such as `python -c`, `python -`, `node -e`, `ruby -e`, `perl -e`, and `sh -c` must return `PERMISSION_REQUIRED` by default because network and filesystem effects cannot be verified statically.
 - `rm -rf /`, `git reset --hard`, broad `chmod`/`chown`, and similar destructive commands must not execute without explicit permission.
+- Linux Landlock confinement must be applied when available. If it is unavailable, `exec_command` must continue to run under policy checks and include a warning that an external sandbox is required for untrusted commands.
 - Long-running commands return `ok: true`, `status: "running"`, and `session_id`.
 - Timed-out commands must clean up their process group.
 
@@ -994,6 +1001,7 @@ Input schema:
         "long_timeout",
         "sensitive_env",
         "shell_expansion",
+        "inline_script",
         "privileged_executable",
         "write_generated_or_ignored"
       ]
@@ -1016,8 +1024,8 @@ Output schema:
   "properties": {
     "ok": { "type": "boolean" },
     "status": { "type": "string", "enum": ["granted", "denied", "unsupported", "not_required"] },
-    "grant_id": { "type": "string" },
-    "expires_at": { "type": "string", "format": "date-time" },
+    "grant_id": { "type": ["string", "null"] },
+    "expires_at": { "type": ["string", "null"], "format": "date-time" },
     "constraints": { "type": "object", "additionalProperties": true },
     "warnings": { "type": "array", "items": { "type": "string" } },
     "error": { "$ref": "#/$defs/tool_error" }
@@ -1029,8 +1037,9 @@ Output schema:
 Behavior:
 
 - If the MCP client declared `elicitation`, the server may send an `elicitation/create` request to obtain a user decision.
-- If elicitation is unavailable, the tool returns `ok: false`, `status: "unsupported"`, and `ELICITATION_UNSUPPORTED`, unless the server was explicitly started with a documented non-default permission mode such as `allow_all`.
-- Permission grants are scoped to the requested tool, arguments class, workspace, and TTL.
+- If elicitation is unavailable, the tool returns `ok: false`, `status: "unsupported"`, and `ELICITATION_UNSUPPORTED`, unless the server was explicitly started with a documented non-default permission mode such as `--dangerously-skip-all-permissions`.
+- In `--dangerously-skip-all-permissions` mode, permission-gated operations are auto-granted. Workspace path boundaries still apply.
+- v0.1 does not expose a grant registry consumed by `exec_command` or `apply_patch`; `request_permissions` is an unsupported/not-required diagnostic unless dangerous mode is explicitly enabled.
 - Workspace escape is not grantable in v0.1.
 - Dangerous permissions must not be silently granted by default.
 
@@ -1058,6 +1067,9 @@ Input schema:
   "properties": {
     "path": { "type": "string", "minLength": 1 },
     "max_bytes": { "type": "integer", "minimum": 1024, "maximum": 10485760, "default": 5242880 },
+    "max_width": { "type": "integer", "minimum": 1, "maximum": 10000, "default": 2000 },
+    "max_height": { "type": "integer", "minimum": 1, "maximum": 10000, "default": 2000 },
+    "auto_resize": { "type": "boolean", "default": true },
     "output": { "type": "string", "enum": ["mcp_image", "data_url"], "default": "mcp_image" }
   },
   "required": ["path"],
@@ -1077,6 +1089,8 @@ Output schema:
     "bytes": { "type": "integer" },
     "width": { "type": "integer" },
     "height": { "type": "integer" },
+    "resized": { "type": "boolean" },
+    "original": { "type": "object", "additionalProperties": true },
     "data_url": { "type": "string" },
     "warnings": { "type": "array", "items": { "type": "string" } },
     "error": { "$ref": "#/$defs/tool_error" }
@@ -1095,7 +1109,7 @@ For `output: "mcp_image"`, `content` must include an MCP image content item:
 }
 ```
 
-The server must verify image type by content, not only extension. Non-image files return `INVALID_ARGUMENT` or `BINARY_FILE` with a clear message. Oversized images return `OUTPUT_TOO_LARGE`.
+The server must verify image type by content, not only extension. Non-image files return `INVALID_ARGUMENT` or `BINARY_FILE` with a clear message. Oversized images return `OUTPUT_TOO_LARGE`. `auto_resize` requires the optional `image` extra (`Pillow`); if Pillow is unavailable or resizing fails, the tool must include a warning and either return the original image when still within limits or return `OUTPUT_TOO_LARGE` with warning details.
 
 ## Compliance Expectations
 

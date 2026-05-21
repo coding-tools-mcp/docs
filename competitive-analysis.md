@@ -1,6 +1,6 @@
 # Competitive Analysis
 
-This summary condenses the subagent research in [../reports/subagents/competitor-research.md](../reports/subagents/competitor-research.md).
+This summary captures the external tool patterns considered while shaping the public MCP runtime surface.
 
 | Tool | Useful Pattern | Not Borrowed |
 | --- | --- | --- |

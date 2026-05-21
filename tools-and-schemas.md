@@ -8,8 +8,8 @@ The normative schema source is [profile-v0.1.md](profile-v0.1.md). Live schemas 
 - `list_dir`: list directory entries under the workspace.
 - `list_files`: glob workspace files.
 - `search_text`: search text or regex matches.
-- `apply_patch`: apply a Codex-style patch envelope.
-- `exec_command`: run a bounded command under policy and Landlock confinement.
+- `apply_patch`: apply a patch envelope.
+- `exec_command`: run a bounded command under policy, with Landlock confinement when available.
 - `write_stdin`: write to a live server-managed command session.
 - `kill_session`: terminate a server-managed command session.
 - `git_status`: inspect git status.

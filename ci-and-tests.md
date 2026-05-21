@@ -22,7 +22,7 @@ make test-mcp-contract
 make test-tool-golden
 make test-security
 make test-e2e
-make test-codex-compat
+make test-runtime-semantics
 make test-docs-required
 make test-schema-drift
 make dogfood-mcp
@@ -36,9 +36,9 @@ make benchmark-real-workloads
 | --- | --- |
 | `make test-mcp-contract` | MCP initialize, `tools/list`, schemas, annotations, structured success/error envelopes, protocol errors |
 | `make test-tool-golden` | Golden behavior for read/list/search/patch/exec/stdin/kill/git/image paths |
-| `make test-security` | Traversal, symlink escape, command workdir escape, risky env, shell-expansion gating, Linux Landlock confinement, direct syscall denial, timeout/watchdog, buffer caps |
+| `make test-security` | Traversal, symlink escape, command workdir escape, risky env, shell-expansion gating, Linux Landlock fallback behavior, direct syscall denial where Landlock is available, timeout/watchdog, buffer caps |
 | `make test-e2e` | End-to-end coding loops through the runtime |
-| `make test-codex-compat` | Codex-compatible patch/session/image behavior vectors |
+| `make test-runtime-semantics` | Patch/session/image behavior vectors |
 | `make test-docs-required` | Required docs, evidence artifacts, and CI workflow gate checks |
 | `make test-schema-drift` | Live tool schema/annotation names compared against checked-in profile/docs |
 | `make dogfood-mcp` | Unittest MCP-only dogfood cases |
@@ -47,7 +47,7 @@ make benchmark-real-workloads
 | `make benchmark-smoke` | SWE-bench smoke preflight and placeholder prediction validation |
 | `make benchmark-real-workloads` | MCP runtime smoke over real Python, Node, Rust, Go, and monorepo checkouts plus large file/output and long command cases |
 
-Valid runner suites include `all`, `mcp-contract`, `tool-golden`, `security`, `e2e`, `codex-compat`, `dogfood`, `compliance-report`, `docs-required`, and `schema-drift`.
+Valid runner suites include `all`, `mcp-contract`, `tool-golden`, `security`, `e2e`, `runtime-semantics`, `dogfood`, `compliance-report`, `docs-required`, and `schema-drift`.
 
 ## GitHub Actions
 

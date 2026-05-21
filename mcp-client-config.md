@@ -5,9 +5,9 @@ Use MCP protocol version `2025-06-18`.
 ## Codex
 
 ```toml
-[mcp_servers.codex_tool_runtime]
+[mcp_servers.coding_tools]
 command = "uvx"
-args = ["codex-tool-runtime-mcp", "--stdio", "--workspace", "/path/to/repo"]
+args = ["coding-tools-mcp", "--stdio", "--workspace", "/path/to/repo"]
 ```
 
 ## Claude Code
@@ -15,9 +15,9 @@ args = ["codex-tool-runtime-mcp", "--stdio", "--workspace", "/path/to/repo"]
 ```json
 {
   "mcpServers": {
-    "codex-tool-runtime": {
+    "coding-tools": {
       "command": "uvx",
-      "args": ["codex-tool-runtime-mcp", "--stdio", "--workspace", "/path/to/repo"]
+      "args": ["coding-tools-mcp", "--stdio", "--workspace", "/path/to/repo"]
     }
   }
 }
@@ -28,9 +28,9 @@ args = ["codex-tool-runtime-mcp", "--stdio", "--workspace", "/path/to/repo"]
 ```json
 {
   "mcpServers": {
-    "codex-tool-runtime": {
+    "coding-tools": {
       "command": "uvx",
-      "args": ["codex-tool-runtime-mcp", "--stdio", "--workspace", "/path/to/repo"]
+      "args": ["coding-tools-mcp", "--stdio", "--workspace", "/path/to/repo"]
     }
   }
 }

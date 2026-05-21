@@ -10,6 +10,17 @@ Use `--tool-profile read-only` first. It exposes inspection and git read tools p
 
 Use `--tool-profile full` only for trusted MCP clients that support write tools and truthful annotations. Avoid `full` and `compat-readonly-all` for anonymous tunnel testing.
 
+## One-Command Tunnel
+
+Install the published package from PyPI, start the local server, and expose a read-only bearer-token tunnel:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/xyTom/coding-tools-mcp/main/scripts/install.sh \
+  | bash -s -- --tunnel cloudflared --auto-install-tunnel --workspace /path/to/repo
+```
+
+The script prints the local MCP URL, the tunnel provider's HTTPS URL, and the bearer header to configure in clients that support custom headers.
+
 ## Anonymous Read-Only Tunnel
 
 ```bash

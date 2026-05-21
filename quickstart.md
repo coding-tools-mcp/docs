@@ -1,6 +1,32 @@
 # Quickstart
 
-Run the runtime directly with `uvx` against the current directory:
+Install the published command from PyPI:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/xyTom/coding-tools-mcp/main/scripts/install.sh | bash
+```
+
+Install and start local Streamable HTTP against a workspace:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/xyTom/coding-tools-mcp/main/scripts/install.sh \
+  | bash -s -- --start --workspace /path/to/repo
+```
+
+Install and expose a read-only bearer-token tunnel:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/xyTom/coding-tools-mcp/main/scripts/install.sh \
+  | bash -s -- --tunnel cloudflared --auto-install-tunnel --workspace /path/to/repo
+```
+
+Or, from this checkout:
+
+```bash
+scripts/install.sh
+```
+
+Run the published package without a persistent install:
 
 ```bash
 uvx coding-tools-mcp --workspace .

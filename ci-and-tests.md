@@ -15,6 +15,23 @@ make ci
 
 Report files are overwritten by whichever suite or benchmark was run most recently. Check `suite` in compliance reports and `conclusion` in benchmark reports before citing them.
 
+## PyPI Release
+
+Publish through the release helper so the same build, check, upload, and install-verification flow is used every time:
+
+```bash
+make publish-testpypi
+make publish-pypi
+```
+
+`make publish-testpypi` uploads to TestPyPI only. `make publish-pypi` uploads to production PyPI and asks for an irreversible-release confirmation. To run both in sequence:
+
+```bash
+make publish-all
+```
+
+The helper expects `TWINE_USERNAME`/`TWINE_PASSWORD` or `~/.pypirc` credentials. For token auth, use `__token__` as the username. After a production upload, bump `[project].version` and `coding_tools_mcp.__version__` before the next release because PyPI files cannot be overwritten.
+
 ## Individual Gates
 
 ```bash

@@ -1,16 +1,16 @@
-# ChatGPT Remote MCP
+# Remote MCP
 
-This guide exposes `coding-tools-mcp` to ChatGPT developer-mode connectors and other remote MCP clients through an HTTPS tunnel.
+This guide exposes `coding-tools-mcp` to remote MCP clients through an HTTPS tunnel.
 
-ChatGPT Apps SDK developer connectors do not use arbitrary static bearer headers. For authenticated ChatGPT apps, OpenAI expects OAuth 2.1 discovery and authorization. OAuth is intentionally out of scope for this server today, so ChatGPT developer-mode testing should use anonymous `read-only` mode only. Static bearer-token auth remains available for generic MCP clients that support custom `Authorization` headers.
+The server implements Streamable HTTP at `/mcp`, publishes remote discovery metadata at `/.well-known/mcp.json` and `/.well-known/mcp/server-card.json`, and supports either no auth or static bearer-token auth on `/mcp`. OAuth-style authorization flows are intentionally out of scope for this server today, so clients that cannot send custom bearer headers should use anonymous `read-only` mode only for local/testing tunnels, or rely on an external auth proxy for production deployments.
 
 ## Profile Choice
 
 Use `--tool-profile read-only` first. It exposes inspection and git read tools plus `set_default_cwd` for navigation, and omits workspace mutation tools such as `apply_patch`, `exec_command`, `write_stdin`, and `kill_session`.
 
-Use `--tool-profile full` only for trusted generic MCP clients that support write tools and truthful annotations. Avoid `full` and `compat-readonly-all` for anonymous ChatGPT tunnel testing.
+Use `--tool-profile full` only for trusted MCP clients that support write tools and truthful annotations. Avoid `full` and `compat-readonly-all` for anonymous tunnel testing.
 
-## ChatGPT Developer Mode
+## Anonymous Read-Only Tunnel
 
 ```bash
 CODING_TOOLS_MCP_AUTH_MODE=noauth \
@@ -18,15 +18,15 @@ CODING_TOOLS_MCP_TOOL_PROFILE=read-only \
 scripts/tunnel.sh cloudflared /path/to/repo
 ```
 
-Configure the ChatGPT connector with the HTTPS tunnel URL:
+Configure the remote MCP client with the HTTPS tunnel URL:
 
 ```text
 https://<tunnel-host>/mcp
 ```
 
-ChatGPT may show `Supported authorization methods: none`. That is expected for this development mode.
+The discovery metadata reports auth type `none` in this mode. Anyone who can reach the tunnel URL can use the exposed read-only tools, so avoid sensitive workspaces and stop the tunnel when testing is done.
 
-## Generic MCP Clients With Bearer Auth
+## MCP Clients With Bearer Auth
 
 For clients that can send custom headers:
 
@@ -96,4 +96,4 @@ Missing or wrong bearer tokens on `/mcp` should return HTTP `401`.
 
 Keep the server bound to `127.0.0.1` and expose only the tunnel URL. Non-loopback binding without a bearer token is rejected. Use HTTPS tunnel URLs, rotate tokens if they are shared, and do not use `full` or `compat-readonly-all` with untrusted clients.
 
-Anonymous ChatGPT developer-mode testing exposes whatever the selected profile permits to anyone who can reach the tunnel URL. Use `read-only`, avoid sensitive workspaces, and stop the tunnel when testing is done.
+Anonymous remote MCP tunnel testing exposes whatever the selected profile permits to anyone who can reach the tunnel URL. Use `read-only`, avoid sensitive workspaces, and stop the tunnel when testing is done.

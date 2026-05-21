@@ -20,10 +20,10 @@ P0 transport is Streamable HTTP.
 
 - Endpoint: one MCP endpoint, default `/mcp`.
 - Bind address: local deployments must default to `127.0.0.1`, not `0.0.0.0`.
-- Methods: `POST` is required. `GET` for server-sent events is required if the implementation streams server messages; otherwise it must return `405 Method Not Allowed`.
+- Methods: `POST` is required for JSON-RPC. `GET /mcp`, `HEAD /mcp`, `/.well-known/mcp.json`, and `/.well-known/mcp/server-card.json` return server-card metadata for remote-client discovery. `OPTIONS` supports browser preflight.
 - Headers: clients must send `Accept: application/json, text/event-stream` on `POST` requests. After initialization, HTTP clients must include `MCP-Protocol-Version: 2025-06-18` or the negotiated version.
 - Sessions: if the server emits `Mcp-Session-Id` during initialization, clients must send it on later requests. Session IDs must be unguessable visible ASCII values.
-- Security: validate `Origin` for HTTP requests, require loopback by default, and support authentication before non-loopback binding is allowed.
+- Security: validate `Origin` for HTTP requests, require loopback by default, and require bearer authentication before non-loopback binding is allowed. When `--auth-token` or `CODING_TOOLS_MCP_AUTH_TOKEN` is configured, `/mcp` requires `Authorization: Bearer <token>`.
 - Logging: logs go to stderr or structured MCP logging, never to stdout or HTTP response bodies outside JSON-RPC/SSE frames.
 
 P1 transport is stdio.
@@ -200,6 +200,9 @@ Protocol-level errors:
 
 P0 tools:
 
+- `server_info`
+- `get_default_cwd`
+- `set_default_cwd`
 - `read_file`
 - `list_dir`
 - `list_files`
@@ -210,11 +213,20 @@ P0 tools:
 - `kill_session`
 - `git_status`
 - `git_diff`
+- `git_log`
+- `git_show`
+- `git_blame`
 - `request_permissions`
 
 P1 tool:
 
 - `view_image`
+
+Tool profiles:
+
+- `full`: expose all tools with truthful annotations.
+- `read-only`: expose only `server_info`, `get_default_cwd`, `set_default_cwd`, file read/list/search tools, git inspection tools, and `view_image`.
+- `compat-readonly-all`: expose all tools, but advertise `readOnlyHint: true`, `destructiveHint: false`, and `openWorldHint: false` for every tool. This profile is a compatibility escape hatch only; mutation-capable tools still mutate local state.
 
 Forbidden tools and equivalent aliases:
 

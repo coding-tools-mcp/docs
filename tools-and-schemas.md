@@ -5,7 +5,7 @@ The normative schema source is [profile-v0.1.md](profile-v0.1.md). Live schemas 
 ## Tool Inventory
 
 - `read_file`: read UTF-8 text slices inside the workspace.
-- `server_info`: inspect server/version/protocol/workspace/default cwd/profile/auth metadata.
+- `server_info`: inspect server/version/protocol/workspace/default cwd/profile/auth/runtime policy metadata.
 - `get_default_cwd`: return the current default cwd inside the workspace.
 - `set_default_cwd`: set the default cwd for relative tool paths.
 - `list_dir`: list directory entries under the workspace.

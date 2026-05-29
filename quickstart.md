@@ -76,6 +76,18 @@ CODING_TOOLS_MCP_TRACE=1 coding-tools-mcp --workspace /path/to/repo
 
 Trace JSON lines are written to stderr.
 
+For toolchains that require inherited shell variables, start the server with a broader shell environment policy:
+
+```bash
+CODING_TOOLS_MCP_SHELL_ENV_INHERIT=all coding-tools-mcp --workspace /path/to/repo
+```
+
+For dependency downloads, prefer the narrower network gate:
+
+```bash
+coding-tools-mcp --allow-network --workspace /path/to/repo
+```
+
 If the MCP client cannot show permission prompts and you intentionally want permission-gated commands to run:
 
 ```bash

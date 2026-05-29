@@ -16,7 +16,17 @@ If the result returns `status: "running"`, poll with `write_stdin` using empty `
 
 ## Permission Elicitation Is Unsupported
 
-If `request_permissions` returns `ELICITATION_UNSUPPORTED`, the MCP client cannot show approval prompts. For trusted local use, start with `--dangerously-skip-all-permissions` to auto-grant permission-gated operations.
+If `request_permissions` returns `ELICITATION_UNSUPPORTED`, the MCP client cannot show approval prompts. For dependency downloads, prefer `--allow-network`; it opens the network gate without disabling destructive-command, inline-script, or shell-expansion checks. For fully trusted local use, start with `--dangerously-skip-all-permissions` to auto-grant all permission-gated operations.
+
+## Missing Toolchain Environment
+
+`exec_command` defaults to a core shell environment. If tools such as MSVC, CUDA, oneAPI, or Nix depend on variables from the parent terminal, start the server with:
+
+```bash
+CODING_TOOLS_MCP_SHELL_ENV_INHERIT=all coding-tools-mcp --workspace /path/to/repo
+```
+
+This still filters secret-looking and loader/startup variables unless `--dangerously-skip-all-permissions` is also enabled.
 
 ## Trace Tool Calls
 

@@ -74,6 +74,8 @@ Main workflow:
 .github/workflows/compliance.yml
 ```
 
+The main workflow also includes a `windows-msvc-smoke` job. It initializes the Visual Studio C++ environment with `vcvarsall.bat x64`, then verifies that `exec_command` keeps the default `core` environment narrow and that `--shell-env-inherit all` can compile and run a single-file `cl.exe` smoke test.
+
 Manual SWE-bench workflow:
 
 ```text

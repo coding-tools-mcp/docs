@@ -82,16 +82,18 @@ For toolchains that require inherited shell variables, start the server with a b
 CODING_TOOLS_MCP_SHELL_ENV_INHERIT=all coding-tools-mcp --workspace /path/to/repo
 ```
 
-For dependency downloads, prefer the narrower network gate:
+For local development with dependency downloads, shell expansion, and inline interpreter snippets, use trusted mode:
 
 ```bash
-coding-tools-mcp --allow-network --workspace /path/to/repo
+coding-tools-mcp --permission-mode trusted --workspace /path/to/repo
 ```
 
-If the MCP client cannot show permission prompts and you intentionally want permission-gated commands to run:
+`--allow-network` remains a compatibility flag when you only want to open the network-looking command gate.
+
+If the MCP client cannot show permission prompts and you intentionally want to disable `exec_command` permission gates inside an isolated container or VM:
 
 ```bash
-coding-tools-mcp --dangerously-skip-all-permissions --workspace /path/to/repo
+coding-tools-mcp --permission-mode dangerous --workspace /path/to/repo
 ```
 
-Use this only with trusted workspaces and trusted clients. It does not remove workspace path boundaries.
+Use this only with trusted workspaces and trusted clients in an externally hardened environment. `--dangerously-skip-all-permissions` remains as a compatibility alias.

@@ -16,7 +16,7 @@ If the result returns `status: "running"`, poll with `write_stdin` using empty `
 
 ## Permission Elicitation Is Unsupported
 
-If `request_permissions` returns `ELICITATION_UNSUPPORTED`, the MCP client cannot show approval prompts. For dependency downloads, prefer `--allow-network`; it opens the network gate without disabling destructive-command, inline-script, or shell-expansion checks. For fully trusted local use, start with `--dangerously-skip-all-permissions` to auto-grant all permission-gated operations.
+If `request_permissions` returns `ELICITATION_UNSUPPORTED`, the MCP client cannot show approval prompts. For dependency downloads and local development, prefer `--permission-mode trusted`; it allows network-looking commands, shell expansion, and inline scripts while keeping secret filtering and destructive-command checks. For isolated containers or VMs, use `--permission-mode dangerous` to disable `exec_command` permission gates.
 
 ## Missing Toolchain Environment
 
@@ -26,7 +26,11 @@ If `request_permissions` returns `ELICITATION_UNSUPPORTED`, the MCP client canno
 CODING_TOOLS_MCP_SHELL_ENV_INHERIT=all coding-tools-mcp --workspace /path/to/repo
 ```
 
-This still filters secret-looking and loader/startup variables unless `--dangerously-skip-all-permissions` is also enabled.
+This still filters secret-looking and loader/startup variables unless `--permission-mode dangerous` is also enabled.
+
+## Exec Diagnostics
+
+`exec_command` may include `diagnostics` with codes such as `DEV_NULL_DENIED`, `DNS_RESOLUTION_FAILED`, `NETWORK_PERMISSION_REQUIRED`, `TMPDIR_NOT_WRITABLE`, `HOME_NOT_WRITABLE`, `COMMAND_TIMED_OUT`, and `OUTPUT_TRUNCATED`. See [troubleshooting-exec.md](troubleshooting-exec.md).
 
 ## Trace Tool Calls
 

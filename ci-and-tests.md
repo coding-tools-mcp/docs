@@ -91,3 +91,12 @@ Manual real-workload workflow:
 ```
 
 The manual `real-workloads` workflow installs Python, Node, Go, and Rust toolchains, runs `make benchmark-real-workloads`, and uploads `reports/benchmark/real-workloads**`.
+
+Docker workflows:
+
+```text
+.github/workflows/docker-image.yml
+.github/workflows/docker-smoke.yml
+```
+
+`docker-image` builds and publishes the sandbox image to GHCR. `docker-smoke` builds the image, starts `coding-tools-mcp --permission-mode trusted` in a container, verifies MCP metadata and `tools/list`, checks `server_info`, and runs explicit `exec_command` toolchain version commands.

@@ -904,7 +904,7 @@ Output schema:
     "ok": { "type": "boolean" },
     "session_id": { "type": "string" },
     "killed": { "type": "boolean" },
-    "status": { "type": "string", "enum": ["terminated", "exited", "not_found"] },
+    "status": { "type": "string", "enum": ["terminated", "exited", "timeout", "not_found"] },
     "exit_code": { "type": "integer" },
     "signal": { "type": "string" },
     "stdout": { "type": "string" },
@@ -917,6 +917,9 @@ Output schema:
 ```
 
 The tool may terminate only sessions created by this MCP server.
+
+If `status` is `timeout`, the server attempted best-effort termination but did not observe process exit before
+the wait deadline. The session is evicted to avoid unbounded retention.
 
 ### git_status
 

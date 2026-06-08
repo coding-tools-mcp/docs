@@ -38,22 +38,28 @@ Use stdio for MCP clients:
 uvx coding-tools-mcp --stdio --workspace /path/to/repo
 ```
 
-When working from this checkout instead of a published package, install the runtime in editable mode:
+When working from this checkout instead of a published package, start Streamable HTTP with:
 
 ```bash
-python -m pip install -e ".[dev]"
-```
-
-Start Streamable HTTP against a workspace:
-
-```bash
-coding-tools-mcp --workspace /path/to/repo --host 127.0.0.1 --port 8765
+make start
 ```
 
 Endpoint:
 
 ```text
 http://127.0.0.1:8765/mcp
+```
+
+Pass a different workspace, host, port, or extra server flags with Make variables:
+
+```bash
+make start MCP_WORKSPACE=/path/to/repo MCP_PORT=8000 MCP_ARGS="--permission-mode trusted"
+```
+
+If dependencies are missing, install the runtime in editable mode:
+
+```bash
+python -m pip install -e ".[dev]"
 ```
 
 Start stdio:

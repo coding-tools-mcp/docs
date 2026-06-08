@@ -36,6 +36,6 @@ Every tool returns `content`, `structuredContent`, and `isError`. Tool execution
 
 ## Permission Modes
 
-- `safe`: default mode. Commands run with workspace writes, system toolchain read roots, `.coding-tools/home`, `.coding-tools/tmp`, no network, blocked shell expansion, blocked inline scripts, filtered secrets, and Landlock when available.
-- `trusted`: local development mode. It allows network-looking commands, shell expansion, inline scripts, and `/tmp/coding-tools-*` writes while still filtering secrets and blocking destructive commands.
+- `safe`: default mode. Commands run with workspace writes, system toolchain read roots, external server-owned `HOME`/`TMPDIR`/`cache_dir`, no network, blocked shell expansion, blocked inline scripts, filtered secrets, and Landlock when available.
+- `trusted`: local development mode. It allows network-looking commands, shell expansion, and inline scripts while still filtering secrets and blocking destructive commands. Runtime writes remain scoped to the exact external runtime directory, not the whole Git worktree or global `/tmp`.
 - `dangerous`: disables `exec_command` permission gates and Landlock. Use only in an isolated container or VM. Direct file tools still enforce workspace paths.

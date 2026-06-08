@@ -272,7 +272,7 @@ Input schema:
 }
 ```
 
-Output fields include `permission_mode`, `workspace`, `default_cwd`, `network_allowed`, `home`, `tmpdir`, `cache_dir`, `landlock`, and `exec_policy`. `home`, `tmpdir`, and `cache_dir` describe the default `exec_command` environment directories. `landlock` reports availability and ABI when known. `exec_policy` reports shell expansion, inline script, global tmp write, and secret env filter policy.
+Output fields include `permission_mode`, `workspace`, `default_cwd`, `network_allowed`, `runtime_dir`, `home`, `tmpdir`, `cache_dir`, `landlock`, and `exec_policy`. `runtime_dir` is an external server-owned directory outside the Git worktree; `home`, `tmpdir`, and `cache_dir` describe the default `exec_command` environment directories under it. `landlock` reports availability and ABI when known. `exec_policy` reports shell expansion, inline script, global tmp write, and secret env filter policy.
 
 ### check_exec_environment
 
@@ -301,7 +301,7 @@ Input schema:
 }
 ```
 
-Output fields include `ok`, `workspace`, `permission_mode`, `network_allowed`, `home`, `tmpdir`, `cache_dir`, `landlock_enabled`, `landlock_abi`, `global_tmp_write`, and `warnings`.
+Output fields include `ok`, `workspace`, `permission_mode`, `network_allowed`, `runtime_dir`, `home`, `tmpdir`, `cache_dir`, `landlock_enabled`, `landlock_abi`, `global_tmp_write`, and `warnings`.
 
 ### read_file
 
@@ -802,7 +802,7 @@ Policy requirements:
 - `dangerous` mode disables `exec_command` permission gates and Landlock. Direct file and patch tools still enforce workspace path boundaries.
 - Inline interpreter and shell snippets such as `python -c`, `python -`, `node -e`, `ruby -e`, `perl -e`, and `sh -c` must return `PERMISSION_REQUIRED` by default in `safe` mode because network and filesystem effects cannot be verified statically.
 - `rm -rf /`, `git reset --hard`, broad `chmod`/`chown`, and similar destructive commands must not execute without explicit permission.
-- Linux Landlock confinement must be applied when available. If it is unavailable, `exec_command` must continue to run under policy checks and include a warning that an external sandbox is required for untrusted commands.
+- Linux Landlock confinement must be applied when available. Safe and trusted modes must add only the exact external runtime directory as the extra non-workspace writable root. If Landlock is unavailable, `exec_command` must continue to run under policy checks and include a warning that an external sandbox is required for untrusted commands.
 - `exec_command` may include `diagnostics` with machine-readable error attribution while preserving raw stdout, stderr, and exit code.
 - Long-running commands return `ok: true`, `status: "running"`, and `session_id`.
 - Timed-out commands must clean up their process group.

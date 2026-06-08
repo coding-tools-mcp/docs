@@ -29,6 +29,14 @@ coding-tools-mcp \
   --permission-mode trusted
 ```
 
+The entrypoint also sets a default `CODING_TOOLS_MCP_EXEC_ALLOW_ROOTS` for container toolchain configuration files:
+
+```text
+/etc/java-17-openjdk:/etc/maven:/usr/share/maven:/usr/lib/jvm/java-17-openjdk-amd64
+```
+
+Set `CODING_TOOLS_MCP_EXEC_ALLOW_ROOTS` yourself when you need to replace that default.
+
 Use an explicit token when you need deterministic client configuration:
 
 ```bash
@@ -59,6 +67,8 @@ Use only inside an isolated container or VM.
 Smoke commands should be explicit `exec_command` calls, for example:
 
 ```bash
+java -version
+javac -version
 mvn -version
 gcc --version
 node --version && npm --version

@@ -105,6 +105,8 @@ When `CODING_TOOLS_MCP_SERVER_URL` is unset, OAuth metadata and issued JWT claim
 - **ngrok reserved domain** — claim a domain in the ngrok dashboard and either configure it in `~/.config/ngrok/ngrok.yml`, or run `ngrok` yourself (`ngrok http --domain=<reserved> 8765`) and set `CODING_TOOLS_MCP_SERVER_URL=https://<reserved>`.
 - **devtunnel persistent tunnel** — `devtunnel create <id>` + `devtunnel port create <id> -p 8765 --protocol http`, then `devtunnel host <id>`.
 
+For an on-demand cloud sandbox, `.github/workflows/start-sandbox.yml` can start the Docker image in GitHub Actions and expose it through either a quick Cloudflare tunnel or a named Cloudflare Tunnel. The recommended fixed-hostname setup is: save the named tunnel token as the GitHub secret `CLOUDFLARE_TUNNEL_TOKEN`, save a stable MCP bearer token as `CODING_TOOLS_MCP_AUTH_TOKEN`, run the workflow with `tunnel_type=named`, and connect clients to `https://<stable-hostname>/mcp`. The optional [Cloudflare sandbox control worker](../cloudflare/sandbox-control/README.md) adds a small authenticated API/MCP-style tool that dispatches the workflow through the GitHub API.
+
 ## Tunnel Scripts
 
 Each script starts `coding-tools-mcp` on `127.0.0.1` and then starts the selected tunnel provider. If the provider CLI is missing, the script asks before installing it.

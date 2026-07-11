@@ -1,6 +1,7 @@
 # MCP Client Configuration
 
-Use MCP protocol version `2025-06-18`.
+Use MCP protocol version `2025-11-25`. Version `2025-06-18` remains supported
+for existing clients.
 
 ## Codex
 
@@ -48,11 +49,12 @@ The server is designed for local loopback use. Do not bind it to a public interf
 
 ## Remote MCP
 
-For remote MCP clients, keep the server on loopback and expose it through an HTTPS tunnel. Anonymous tunnel testing should use `read-only` mode:
+For remote MCP clients, keep the server on loopback and expose it through an
+HTTPS tunnel with authentication. The fixed tool set includes mutation and
+command execution:
 
 ```bash
-CODING_TOOLS_MCP_AUTH_MODE=noauth \
-CODING_TOOLS_MCP_TOOL_PROFILE=read-only \
+CODING_TOOLS_MCP_AUTH_MODE=bearer \
 scripts/tunnel.sh cloudflared /path/to/repo
 ```
 
@@ -62,4 +64,8 @@ Configure the remote MCP client with:
 URL: https://<tunnel-host>/mcp
 ```
 
-Static bearer-token auth is available for MCP clients that support custom `Authorization` headers. MCP clients that speak OAuth 2.1 Authorization Code + PKCE can use `--oauth-mode` instead, which publishes the standard discovery endpoints (`/.well-known/oauth-authorization-server`, `/.well-known/oauth-protected-resource`) and an HTML password gate on `/oauth/authorize`. Clients that cannot send custom bearer headers and do not speak OAuth should use anonymous `read-only` mode only for local/testing tunnels, or be placed behind an external auth proxy for production use. See [Remote MCP](remote-mcp.md) for details.
+Static bearer-token auth is available for clients that support custom
+`Authorization` headers. OAuth-aware MCP clients can use `--oauth-mode`, which
+publishes protected-resource and authorization-server discovery plus RFC 7591
+dynamic registration and a PKCE authorization flow. Clients that support
+neither require an external authenticated proxy. See [Remote MCP](remote-mcp.md).

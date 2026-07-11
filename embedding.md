@@ -41,7 +41,7 @@ class CodingToolsClient {
     });
 
     await this.#request("initialize", {
-      protocolVersion: "2025-06-18",
+      protocolVersion: "2025-11-25",
       capabilities: {},
       clientInfo: { name: "my-agent", version: "0.1.0" },
     });
@@ -117,7 +117,7 @@ class CodingToolsClient:
         self.proc = subprocess.Popen(cmd, stdin=subprocess.PIPE, stdout=subprocess.PIPE, text=True)
         self.next_id = 1
         self.request("initialize", {
-            "protocolVersion": "2025-06-18",
+            "protocolVersion": "2025-11-25",
             "capabilities": {},
             "clientInfo": {"name": "my-agent", "version": "0.1.0"},
         })
@@ -199,4 +199,5 @@ consequences for embedders:
   when the workload genuinely needs the full host environment; sensitive
   variables are still filtered outside dangerous mode.
 
-*`HOME` is redirected to a per-workspace runtime dir; see the profile doc.
+*`HOME` is redirected to a per-runtime directory; see the
+[runtime contract](runtime-contract-v0.2.md).

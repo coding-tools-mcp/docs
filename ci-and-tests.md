@@ -57,7 +57,7 @@ make benchmark-real-workloads
 | `make test-e2e` | End-to-end coding loops through the runtime |
 | `make test-runtime-semantics` | Patch/session/image behavior vectors |
 | `make test-docs-required` | Required docs, evidence artifacts, and CI workflow gate checks |
-| `make test-schema-drift` | Live tool schema/annotation names compared against checked-in profile/docs |
+| `make test-schema-drift` | Live tool schema/annotation names compared against the checked-in runtime contract/docs |
 | `make dogfood-mcp` | Unittest MCP-only dogfood cases |
 | `make dogfood-runner` | Full deterministic HTTP dogfood transcript and report |
 | `make dogfood-smoke` | Both dogfood suites |
@@ -74,7 +74,11 @@ Main workflow:
 .github/workflows/compliance.yml
 ```
 
-The main workflow also includes a `windows-msvc-smoke` job. It initializes the Visual Studio C++ environment with `vcvarsall.bat x64`, then verifies that `exec_command` keeps the default `core` environment narrow and that `--shell-env-inherit all` can compile and run a single-file `cl.exe` smoke test.
+The main workflow also includes a `windows-msvc-smoke` job. It verifies that
+Windows reports unsupported TTY requests explicitly, force-kills a background
+session without relying on POSIX `SIGKILL`, initializes Visual Studio with
+`vcvarsall.bat x64`, checks the narrow default `core` environment, and confirms
+that `--shell-env-inherit all` can compile and run a single-file `cl.exe` smoke.
 
 Manual SWE-bench workflow:
 

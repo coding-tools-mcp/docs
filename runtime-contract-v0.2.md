@@ -70,9 +70,17 @@ Every valid `tools/call` response contains:
 ```
 
 `content` is concise model-facing text and is never a JSON serialization of the
-whole payload. Model-facing previews are bounded. `structuredContent` is the
-complete, stable machine-readable interface. Large diffs and command output are
-not copied into `_meta`; `_meta` is optional UI extension space only.
+whole payload. Its normal size is governed by each tool's own per-call limits
+(`max_bytes`, `max_output_bytes`, `max_results`, ...), without the former
+16 KiB renderer preview cap. A 2,162,688-byte emergency safety ceiling protects
+clients from pathological individual entries that count-based limits cannot
+bound. Command results always begin with a status line (status, exit code,
+signal, timeout). Stable pageable truncation names an executable continuation
+call (`read_output(output_ref=..., offset=...)`,
+`read_file(path=..., start_line=...)`, ...); non-pageable results explicitly
+say which limit or scope to change. `structuredContent` is the complete,
+stable machine-readable interface. Large diffs and command output are not
+copied into `_meta`; `_meta` is optional UI extension space only.
 
 Tool failures keep the same envelope with `isError: true`, a readable error in
 `content`, and this machine shape:
@@ -122,7 +130,9 @@ short command normally finishes in one call. A running command returns:
 
 Call `write_stdin` with empty `chars` to poll. `read_output` is needed only when
 output is truncated or a caller explicitly requested compact retained output.
-Its offsets are absolute and independent for stdout and stderr.
+Its offsets are absolute and independent for stdout and stderr. A single
+truncated stream is selected by `next_action`; when both streams are truncated,
+`next_actions` contains one executable `read_output` call for each stream.
 
 Active processes, completed-output sessions, per-session bytes, and total
 runtime bytes are bounded. Completed sessions have a TTL. POSIX `tty=true` uses

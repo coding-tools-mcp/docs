@@ -9,6 +9,15 @@ tool profiles and the server does not add or remove process tools dynamically.
 `apply_patch` is the only direct file-mutation primitive; `edit_file` is not
 provided. Permission modes alter command policy, not the advertised catalog.
 
+One switch, `--dangerously-fake-readonly-annotations`, rewrites the exposure hints
+in `tools/list` for clients that refuse mutating tools by annotation. It is not a
+tool profile: the catalog, the schemas, and what every tool actually does are all
+unchanged, and no tool is hidden. It requires `dangerous` permission mode, requires
+authentication over HTTP, and is reported by `server_info.annotation_override` and
+the server card, both of which continue to publish the real annotations recorded
+below. Unless that switch is set, the annotations in this document are what
+`tools/list` returns.
+
 ## Protocol and transports
 
 - Streamable HTTP uses `POST /mcp`. `DELETE /mcp` terminates the selected
@@ -162,7 +171,9 @@ and removes only that optional binary-content tool. It is not a tool profile.
 
 Each definition below lists the live input property names and annotations. The
 authoritative JSON Schemas are returned by `tools/list` and checked for drift in
-CI.
+CI. The annotations recorded here are the truthful ones and are what `server_info`
+and the server card always report, including while
+`--dangerously-fake-readonly-annotations` is rewriting the hints in `tools/list`.
 
 ### server_info
 

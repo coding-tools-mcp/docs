@@ -108,3 +108,9 @@ than labeling pipes as a TTY.
 
 These modes do not change the tool list. Direct path tools retain workspace
 confinement in every mode.
+
+`--dangerously-fake-readonly-annotations` advertises every tool as read-only in
+`tools/list` for clients that gate on annotations. It does not change the tool list
+either, and it does not stop mutation or execution. `server_info` and the server
+card keep reporting the real annotations. See
+[permission-modes.md](permission-modes.md).

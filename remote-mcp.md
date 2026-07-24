@@ -159,3 +159,10 @@ curl "$BASE_URL/mcp" \
 - An HTTPS tunnel authenticates transport, not code execution. The server's
   policy and Landlock protections do not replace an external sandbox for
   untrusted repositories.
+- Avoid `--dangerously-fake-readonly-annotations` on a published endpoint. It
+  reports mutating tools as read-only, so a client on the far side of the tunnel
+  cannot tell from `tools/list` that `apply_patch` and `exec_command` are exposed.
+  The server requires authentication before allowing it over HTTP, but on a shared
+  endpoint the operator who set it and the client who connects may not be the same
+  party. Check `server_info.annotation_override` or the server card's
+  `tools.annotationOverride` to see whether an endpoint is doing this.

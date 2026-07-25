@@ -17,7 +17,26 @@ Report files are overwritten by whichever suite or benchmark was run most recent
 
 ## PyPI Release
 
-Publish through the release helper so the same build, check, upload, and install-verification flow is used every time:
+The release commit must have successful `compliance`, `real-workloads`,
+`swebench-lite`, and `final-audit` workflow runs before either registry publish
+workflow will proceed. Create `v<project-version>` at that exact commit, run the
+three evidence workflows, then run `final-audit` with their run IDs.
+
+Publishing a GitHub Release triggers `.github/workflows/publish-pypi.yml`. The
+workflow checks out the release tag, validates package and changelog versions,
+requires a successful `final-audit` for the same commit, builds the wheel and
+sdist, inspects desktop resources and entry points, installs the wheel in a
+clean environment, and only then publishes through PyPI trusted publishing.
+
+The npm launcher has its own version and is published independently. Run the
+manual `.github/workflows/publish-npm.yml` workflow with the Python release tag
+that contains the launcher source. It runs the launcher tests, packs npm
+`coding-tools-mcp`, requires the same final audit, and publishes through npm
+trusted publishing. Bump `npm/coding-tools-mcp/package.json` before every npm
+release; npm package versions cannot be overwritten.
+
+For local or recovery publishing, use the release helper so the same build,
+check, upload, and install-verification flow is used every time:
 
 ```bash
 make publish-testpypi

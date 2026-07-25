@@ -11,16 +11,33 @@ make ci
 
 `make compliance` runs the full compliance suite and writes `reports/compliance/latest.json` and `reports/compliance/latest.md`.
 
-`make ci` mirrors the main CI workflow: lint, typecheck, unittest discovery, protocol tests, integration/security tests, required docs checks, schema drift checks, dogfood smoke, and SWE-bench smoke preflight.
+`make ci` mirrors the main CI workflow: lint, typecheck, unittest discovery, npm launcher checks, protocol tests, integration/security tests, required docs checks, schema drift checks, dogfood smoke, and SWE-bench smoke preflight. It requires Python 3.11 or newer plus Node.js 18 or newer and npm; GitHub Actions uses Node.js 22.
 
 Report files are overwritten by whichever suite or benchmark was run most recently. Check `suite` in compliance reports and `conclusion` in benchmark reports before citing them.
 
 ## PyPI Release
 
-The release commit must have successful `compliance`, `real-workloads`,
-`swebench-lite`, and `final-audit` workflow runs before either registry publish
-workflow will proceed. Create `v<project-version>` at that exact commit, run the
-three evidence workflows, then run `final-audit` with their run IDs.
+The `final-audit` workflow is a release-only gate. The release commit must have
+successful `compliance`, `real-workloads`, `swebench-lite`, and `final-audit`
+workflow runs before either registry publish workflow will proceed.
+
+Use this order so a GitHub Release never starts publishing before its evidence
+exists:
+
+1. Merge the final release commit.
+2. Create and push `v<project-version>` at that exact commit, but do not publish
+   the GitHub Release yet.
+3. Dispatch `compliance`, `real-workloads`, and `swebench-lite` from that tag.
+4. Dispatch `final-audit` from the same tag with those three run IDs and the tag.
+5. After `final-audit` succeeds, publish the GitHub Release to trigger PyPI.
+6. Dispatch `publish-npm` from the same tag and pass that tag as `release_tag`.
+
+Dispatch release workflows with the tag as the workflow ref, for example
+`gh workflow run <workflow>.yml --ref v0.2.0`. Pass `release_tag=v0.2.0` to
+workflows that declare that input. The publish workflows reject a branch
+dispatch even when its `release_tag` input names a valid tag, because the
+workflow ref, event SHA, checked-out commit, audit evidence, and registry
+provenance must all identify the same release commit.
 
 Publishing a GitHub Release triggers `.github/workflows/publish-pypi.yml`. The
 workflow checks out the release tag, validates package and changelog versions,
@@ -54,6 +71,9 @@ The helper expects `TWINE_USERNAME`/`TWINE_PASSWORD` or `~/.pypirc` credentials.
 ## Individual Gates
 
 ```bash
+make check-dispatch-inputs
+make check-npm-launcher
+make check-release
 make test-mcp-contract
 make test-tool-golden
 make test-security
@@ -70,6 +90,9 @@ make benchmark-real-workloads
 
 | Command | Coverage |
 | --- | --- |
+| `make check-dispatch-inputs` | Cloudflare Worker dispatch body compared with the sandbox workflow inputs |
+| `make check-npm-launcher` | npm launcher argument forwarding, runner fallback, exit behavior, and package contents |
+| `make check-release` | Python/module/npm versions and release changelog checked against `RELEASE_TAG`, which defaults from `pyproject.toml` |
 | `make test-mcp-contract` | MCP initialize, `tools/list`, schemas, annotations, structured success/error envelopes, protocol errors |
 | `make test-tool-golden` | Golden behavior for read/list/search/patch/exec/stdin/kill/git/image paths |
 | `make test-security` | Traversal, symlink escape, command workdir escape, risky env, shell-expansion gating, Linux Landlock fallback behavior, direct syscall denial where Landlock is available, timeout/watchdog, buffer caps |

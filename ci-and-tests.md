@@ -17,40 +17,34 @@ Report files are overwritten by whichever suite or benchmark was run most recent
 
 ## PyPI Release
 
-The `final-audit` workflow is a release-only gate. The release commit must have
-successful `compliance`, `real-workloads`, `swebench-lite`, and `final-audit`
-workflow runs before either registry publish workflow will proceed.
+Releasing is one action: push the version tag.
 
-Use this order so a GitHub Release never starts publishing before its evidence
-exists:
+1. Merge the release commit (version bumped in `pyproject.toml` and
+   `coding_tools_mcp/__init__.py`, CHANGELOG `Unreleased` folded into a dated
+   `## <version> - YYYY-MM-DD` heading).
+2. `git tag v<version> && git push origin v<version>`
 
-1. Merge the final release commit.
-2. Create and push `v<project-version>` at that exact commit, but do not publish
-   the GitHub Release yet.
-3. Dispatch `compliance`, `real-workloads`, and `swebench-lite` from that tag.
-4. Dispatch `final-audit` from the same tag with those three run IDs and the tag.
-5. After `final-audit` succeeds, publish the GitHub Release to trigger PyPI.
-6. Dispatch `publish-npm` from the same tag and pass that tag as `release_tag`.
+Pushing the tag triggers `.github/workflows/release.yml`, which runs everything
+from that single commit: release-metadata validation
+(`scripts/check_release_versions.py`), the `compliance`, `real-workloads`, and
+`swebench-lite` evidence workflows as called jobs, the wheel/sdist build with
+content and clean-install verification, PyPI trusted publishing, npm trusted
+publishing with provenance, and finally the GitHub Release with notes taken
+from the CHANGELOG section. There are no inputs, no run ids to copy, and no
+ref choices: evidence and publishes are jobs of one workflow run, so the
+same-release-commit property holds by construction, and a failed evidence job
+blocks both registries.
 
-Dispatch release workflows with the tag as the workflow ref, for example
-`gh workflow run <workflow>.yml --ref v0.2.0`. Pass `release_tag=v0.2.0` to
-workflows that declare that input. The publish workflows reject a branch
-dispatch even when its `release_tag` input names a valid tag, because the
-workflow ref, event SHA, checked-out commit, audit evidence, and registry
-provenance must all identify the same release commit.
+The npm launcher keeps its own version. The pipeline publishes it only when
+`npm/coding-tools-mcp/package.json` names a version that is not yet on the
+registry, so server-only releases skip the npm jobs automatically; bump the
+launcher version whenever its source changes (npm versions cannot be
+overwritten).
 
-Publishing a GitHub Release triggers `.github/workflows/publish-pypi.yml`. The
-workflow checks out the release tag, validates package and changelog versions,
-requires a successful `final-audit` for the same commit, builds the wheel and
-sdist, inspects desktop resources and entry points, installs the wheel in a
-clean environment, and only then publishes through PyPI trusted publishing.
-
-The npm launcher has its own version and is published independently. Run the
-manual `.github/workflows/publish-npm.yml` workflow with the Python release tag
-that contains the launcher source. It runs the launcher tests, packs npm
-`coding-tools-mcp`, requires the same final audit, and publishes through npm
-trusted publishing. Bump `npm/coding-tools-mcp/package.json` before every npm
-release; npm package versions cannot be overwritten.
+PyPI and npm trusted publishing must both be configured with workflow filename
+`release.yml` and the `pypi` / `npm` environments. The `final-audit` workflow
+remains available as a manual, dispatch-only audit of an existing tag; it is
+no longer part of the release path.
 
 For local or recovery publishing, use the release helper so the same build,
 check, upload, and install-verification flow is used every time:

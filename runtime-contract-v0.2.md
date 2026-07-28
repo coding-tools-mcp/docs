@@ -153,7 +153,7 @@ of pretending pipes are a TTY.
 Non-loopback deployment requires bearer or OAuth authentication unless the
 operator explicitly selects no-auth. OAuth implements Authorization Code +
 PKCE S256, protected-resource metadata, authorization-server metadata, exact
-redirect URI matching, one-time five-minute codes, one-hour access tokens, and
+redirect URI matching, one-time five-minute codes, 24-hour access tokens, and
 RFC 7591 dynamic client registration at `POST /oauth/register`. Public and
 confidential clients are bound to their registered authentication method.
 

@@ -66,7 +66,7 @@ Registration rules:
   dynamic clients to register again.
 
 Authorization codes are single-use and expire after five minutes. Access tokens
-default to one hour and are bound to the registered client and exact MCP
+default to 24 hours and are bound to the registered client and exact MCP
 resource URL.
 
 ## OAuth configuration
@@ -81,8 +81,8 @@ CODING_TOOLS_MCP_SERVER_URL=https://mcp.example.com
 # Optional stable HS256 key; hex-encoded bytes:
 CODING_TOOLS_MCP_OAUTH_TOKEN_SECRET=<hex-key>
 
-# Optional token lifetime in seconds; default 3600:
-CODING_TOOLS_MCP_OAUTH_TOKEN_TTL=3600
+# Optional token lifetime in seconds; default 86400:
+CODING_TOOLS_MCP_OAUTH_TOKEN_TTL=86400
 ```
 
 With an ephemeral tunnel, omit `CODING_TOOLS_MCP_SERVER_URL`; the server derives

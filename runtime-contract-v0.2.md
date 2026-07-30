@@ -23,9 +23,11 @@ below. Unless that switch is set, the annotations in this document are what
 - Streamable HTTP uses `POST /mcp`. `DELETE /mcp` terminates the selected
   `Mcp-Session-Id`. Because this server does not provide an SSE stream,
   `GET /mcp` and `HEAD /mcp` return `405`.
-- Each successful HTTP `initialize` creates an independent runtime. Its cwd,
-  process sessions, retained output, and runtime directories are not shared
-  with other MCP sessions.
+- Each successful HTTP `initialize` creates an independent transport runtime.
+  Its default cwd and request context are not shared with other MCP sessions.
+  Command sessions and retained output are workspace resources, so another
+  authenticated client for the same workspace can continue a command using
+  the `session_id` returned by `exec_command`.
 - Subsequent HTTP messages must include the returned `Mcp-Session-Id` and the
   negotiated `MCP-Protocol-Version`. Unknown or expired sessions return `404`.
 - JSON-RPC batches are rejected. Cancellation uses

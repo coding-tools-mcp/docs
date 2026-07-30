@@ -84,7 +84,7 @@ Mode bits, BOM, and newline style are preserved; moves inherit source mode.
 
 `exec_command` and `write_stdin` default `yield_time_ms` to `10000`. Short
 commands ordinarily return `status: "exited"` in one call. A still-running
-command returns a `session_id` and machine-readable `next_action` for
+command returns a `session_id` and a machine-readable `next_action` for
 `write_stdin` with empty `chars`.
 
 Only truncated terminal output returns a `read_output` next action by default.

@@ -119,11 +119,11 @@ MCP-Protocol-Version: 2025-11-25
 ```
 
 Each ID owns separate transport-local state such as the default cwd and request
-context. Command sessions are workspace resources instead, so another
+context. Commands are workspace resources instead, so another
 authenticated client connected to the same workspace can continue a command
-using the `session_id` returned by `exec_command`. `DELETE /mcp` terminates only
+using the `command_id` returned by `exec_command`. `DELETE /mcp` terminates only
 the selected transport runtime; it does not terminate workspace commands. HTTP
-sessions are bounded and expire after inactivity, while runs keep their own
+sessions are bounded and expire after inactivity, while commands keep their own
 existing timeout, count, output, and retention limits.
 
 This implementation returns `405` for `GET /mcp` because it does not provide an

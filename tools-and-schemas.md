@@ -129,6 +129,14 @@ are stream-specific absolute byte positions. Runtime limits bound active
 commands, retained completed commands, per-command output, total output, and
 retention time.
 
+Each stream retains the earliest output (a frozen head segment, one eighth of
+the per-stream budget) plus the most recent output (a rolling tail). When a
+command produces more output than the budget, bytes between the head and the
+tail are evicted permanently; `read_output` reports the loss via
+`evicted_gap_bytes` and `omitted_bytes`. For output expected to exceed the
+budget, redirect it to a file (`cmd > out.log 2>&1`) and page it with
+`read_file` or `search_text` instead of relying on retained output.
+
 Use `tty: true` only when a program requires a terminal. POSIX receives a real
 PTY (`isatty()` is true). This build returns `TTY_UNSUPPORTED` on Windows rather
 than labeling pipes as a TTY.

@@ -307,6 +307,12 @@ Inputs: `"output_ref"`, `"stream"`, `"offset"`, `"limit"`.
 
 Annotations: `{"title":"Read output","readOnlyHint":true,"destructiveHint":false,"idempotentHint":true,"openWorldHint":false}`.
 
+Retention is head+tail per stream: the earliest bytes (head) and the most
+recent bytes (rolling tail) are kept; the range between them may be evicted
+once the per-stream buffer overflows. Responses report `head_retained_bytes`,
+`evicted_gap_bytes`, and `omitted_bytes`; reads inside the evicted range clamp
+forward to the tail. Offsets remain absolute and stable.
+
 Example: `{"output_ref":"command:abc:stdout","offset":0,"limit":4096}`.
 
 ### git_status

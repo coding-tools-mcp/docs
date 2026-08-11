@@ -290,11 +290,14 @@ Input example: `{"command_id":"abc","chars":"yes\n"}`.
 
 ### kill_command
 
-Inputs: `"command_id"`, `"signal"`, `"wait_ms"`, `"max_output_bytes"`, `"verbosity"`, `"preview_bytes"`.
+Inputs: `"command_id"`, `"signal"`, `"wait_ms"`, `"kill_wait_ms"`, `"max_output_bytes"`, `"verbosity"`, `"preview_bytes"`.
 
 Annotations: `{"title":"Kill command","readOnlyHint":false,"destructiveHint":true,"idempotentHint":false,"openWorldHint":false}`.
 
 Statuses are `["terminated", "killed", "exited", "terminating", "not_found"]`.
+
+If the process is still alive `"wait_ms"` after a non-KILL signal, the runtime
+escalates to a hard kill and waits up to `"kill_wait_ms"` for the exit.
 
 Example: `{"command_id":"abc","signal":"KILL"}`.
 

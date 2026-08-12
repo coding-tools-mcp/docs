@@ -1,6 +1,6 @@
 # Tools And Schemas
 
-The normative behavior is [runtime-contract-v0.2.md](runtime-contract-v0.2.md).
+The normative behavior is [runtime-contract-v0.3.md](runtime-contract-v0.3.md).
 Live JSON Schemas come from `tools/list`; CI compares their names, input
 properties, annotations, and error codes with the contract.
 

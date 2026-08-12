@@ -2,9 +2,19 @@
 
 ## Protocol Version Errors
 
-HTTP clients should send the version negotiated at initialization, normally
-`MCP-Protocol-Version: 2025-11-25`. Compatibility clients may negotiate
-`2025-06-18`; unsupported versions return a JSON-RPC error.
+Send `MCP-Protocol-Version` on every HTTP request. A `2026-07-28` client sends
+`MCP-Protocol-Version: 2026-07-28`, repeating the version in its
+`params._meta`; a header that disagrees with the body, or is missing from such
+a request, returns `400` with `-32020`. A handshake client sends the version it
+negotiated at initialization, normally `MCP-Protocol-Version: 2025-11-25`, or
+`2025-06-18` for compatibility. A header naming a version this server does not
+know returns `400` with `-32600` and lists the ones it does; a request with no
+header at all is read as `2025-11-25`.
+
+Asking to handshake with a version this server does not speak is no longer an
+error: `initialize` answers with the newest version it does speak. If a client
+seems to be on an older protocol than expected, read the `protocolVersion` in
+the `InitializeResult` rather than assuming the one that was requested.
 
 ## SANDBOX_UNAVAILABLE
 

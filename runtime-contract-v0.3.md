@@ -1,10 +1,12 @@
-# Coding Tools MCP Runtime Contract v0.2
+# Coding Tools MCP Runtime Contract v0.3
 
-Status: frozen. This is the implemented contract for `coding-tools-mcp` 0.2.x
-and is kept as it was; the current one is
-[runtime-contract-v0.3.md](runtime-contract-v0.3.md).
+Status: implemented contract for `coding-tools-mcp` 0.3.x. The frozen contract
+for 0.2.x is [runtime-contract-v0.2.md](runtime-contract-v0.2.md); what changed
+between them, and what a client has to do about it, is
+[migration-0.3.md](migration-0.3.md).
 
-Protocol target: MCP `2025-11-25`, with explicit compatibility for `2025-06-18`.
+Protocol targets: MCP `2026-07-28`, which serves every request on its own, and
+the handshake era `2025-11-25` with explicit compatibility for `2025-06-18`.
 
 This contract describes one stable, model-neutral coding tool set. There are no
 tool profiles and the server does not add or remove process tools dynamically.
@@ -20,45 +22,179 @@ the server card, both of which continue to publish the real annotations recorded
 below. Unless that switch is set, the annotations in this document are what
 `tools/list` returns.
 
-## Protocol and transports
+## Two protocol eras, one server
 
-- Streamable HTTP uses `POST /mcp`. `DELETE /mcp` terminates the selected
-  `Mcp-Session-Id`. Because this server does not provide an SSE stream,
-  `GET /mcp` and `HEAD /mcp` return `405`.
-- Each successful HTTP `initialize` creates an independent transport runtime.
-  Its default cwd and request context are not shared with other MCP sessions.
-  Commands and retained output are workspace resources, so another
-  authenticated client for the same workspace can continue a command using
-  the `command_id` returned by `exec_command`.
-- Subsequent HTTP messages must include the returned `Mcp-Session-Id` and the
-  negotiated `MCP-Protocol-Version`. Unknown or expired sessions return `404`.
-- JSON-RPC batches are rejected. Cancellation uses
-  `notifications/cancelled.params.requestId`.
+Both eras are served by the one runtime that owns the workspace, and neither
+leaves state behind. Which era a request belongs to is decided by the request
+alone: a `params._meta` carrying `io.modelcontextprotocol/protocolVersion` is a
+`2026-07-28` request, and everything else is a handshake-era one. A legacy
+`_meta` such as `progressToken` does not make a request modern, and `initialize`
+is always the handshake, whatever `_meta` it carries.
+
+The only advertised server capability is stable tools with `listChanged: false`,
+in both eras. Logging, resources, prompts, sampling, and elicitation are not
+advertised.
+
+### The handshake era
+
+- `initialize` negotiates a version and answers with it. A version this server
+  does not speak — including `2026-07-28`, which is not negotiated at all — is
+  answered with an `InitializeResult` naming the newest version that it does
+  (`2025-11-25`), as the handshake spec requires.
+- `initialize` is idempotent and is not an admission gate. Each one negotiates
+  on its own, and every other implemented method is served whether or not one
+  was sent first. `notifications/initialized` is accepted and answered with
+  nothing.
+- No session is created. HTTP responses carry no `Mcp-Session-Id`, and a header
+  returned by a client that spoke to an older server is ignored rather than
+  refused.
+- The results of this era are exactly what they were: no field of the modern
+  era is added to them, and every error is HTTP `200` with the JSON-RPC error.
+
+### The `2026-07-28` era
+
+A request states its own protocol version, so it needs no handshake and may
+call `server/discover`, `ping`, `tools/list`, and `tools/call` immediately.
+`notifications/cancelled` is accepted here as well. Its `params._meta` carries:
+
+| `_meta` key | Required | Value |
+| --- | --- | --- |
+| `io.modelcontextprotocol/protocolVersion` | yes | `"2026-07-28"` |
+| `io.modelcontextprotocol/clientCapabilities` | yes | object, may be empty |
+| `io.modelcontextprotocol/clientInfo` | no | object naming the client |
+
+```json
+{
+  "jsonrpc": "2.0",
+  "id": 1,
+  "method": "tools/list",
+  "params": {
+    "_meta": {
+      "io.modelcontextprotocol/protocolVersion": "2026-07-28",
+      "io.modelcontextprotocol/clientCapabilities": {}
+    }
+  }
+}
+```
+
+Over Streamable HTTP such a request also mirrors its body in headers, as
+SEP-2243 requires, so a gateway can route it without reading the body:
+
+- `MCP-Protocol-Version` repeats the `_meta` protocol version.
+- `Mcp-Method` repeats the JSON-RPC method, on notifications too.
+- `Mcp-Name` repeats the subject of the methods that name one: `params.name`
+  for `tools/call` and `prompts/get`, `params.uri` for `resources/read`. A
+  value that cannot travel as an HTTP field is wrapped as
+  `=?base64?<base64 of the UTF-8 value>?=`. No other method takes this header,
+  `server/discover` included.
+
+Handshake-era requests are asked for none of these headers. A
+`MCP-Protocol-Version: 2026-07-28` header over a body that carries no modern
+`_meta` is a mirror violation like any other.
+
+### `server/discover`
+
+The probe a `2026-07-28` client sends in place of a handshake. It reports the
+versions this server speaks per request, its capabilities, and the workspace
+instructions:
+
+```json
+{
+  "supportedVersions": ["2026-07-28"],
+  "capabilities": {"tools": {"listChanged": false}},
+  "instructions": "...",
+  "resultType": "complete",
+  "ttlMs": 0,
+  "cacheScope": "private",
+  "_meta": {
+    "io.modelcontextprotocol/serverInfo": {
+      "name": "coding-tools-mcp",
+      "title": "Coding Tools MCP",
+      "version": "0.3.0"
+    }
+  }
+}
+```
+
+`supportedVersions` lists the modern versions only. The handshake versions are
+negotiated by `initialize` and are not accepted in `_meta`, so naming one here
+would invite a client to retry a version that cannot work.
+
+A `server/discover` that carries no modern `_meta` is a handshake-era request
+for a method this server does not implement in that era, and is answered with
+`-32601`. That is what sends a client which probes before it handshakes to
+`initialize`, which works.
+
+### Result encoding
+
+A `2026-07-28` result carries `resultType: "complete"` and an
+`_meta.io.modelcontextprotocol/serverInfo` naming this server. The results
+whose content a client might be tempted to keep — `tools/list` and
+`server/discover` — also carry `ttlMs: 0` and `cacheScope: "private"` on the
+result root. Both are shaped by the workspace and the permission mode they were
+served under, and the discover instructions quote the workspace's own
+instruction files, so the conservative defaults are the correct ones: never
+shared, never reused. A tool result that failed still reports
+`resultType: "complete"` with `isError: true`; the envelope was complete, the
+tool was not.
+
+### Errors and HTTP statuses
+
+| Code | Meaning | HTTP status of a `2026-07-28` request |
+| --- | --- | --- |
+| `-32600` | invalid request, or an `MCP-Protocol-Version` header naming a version this server does not know (`data.supported` lists both eras) | `400` |
+| `-32601` | unknown method | `404` |
+| `-32602` | invalid params, including a missing or mistyped required `_meta` field | `400` |
+| `-32020` | headers do not mirror the body: missing, or contradicting it | `400` |
+| `-32022` | `_meta` names a protocol version this server does not speak; `data.supported` lists the modern versions only | `400` |
+| `-32603` | unexpected server failure | `200` |
+| `-32700` | parse error | `400` |
+
+Every handshake-era error stays HTTP `200` with the JSON-RPC error in the body,
+which is the only thing a client of that era reads. `-32002 Server not
+initialized` and `-32001 Unknown MCP session` are never returned by any era.
+
+### Transports
+
+- Streamable HTTP uses `POST /mcp`. There are no sessions, so `DELETE /mcp`
+  returns `405` with `Allow: POST`. Because this server does not provide an SSE
+  stream, `GET /mcp` and `HEAD /mcp` return `405` as well.
+- A request without an `MCP-Protocol-Version` header is treated as
+  `2025-11-25`, this server's newest handshake version. The older spec suggests
+  assuming `2025-03-26`, a version this server does not speak; the value only
+  selects what is echoed and recorded, never what a method does.
+- JSON-RPC batches are rejected.
+- `notifications/cancelled` is accepted in both eras and answered with nothing,
+  but it does not terminate the command the cancelled request started. A
+  command outlives its request and is shared by every client of the workspace;
+  terminate one with `kill_command`.
 - stdio is newline-delimited JSON-RPC. stdout contains protocol messages only;
   diagnostics and logs go to stderr.
-- The only advertised server capability is stable tools with
-  `listChanged: false`. Logging, resources, prompts, sampling, and elicitation
-  are not advertised.
-
-The server accepts only the protocol versions listed above. A supported version
-is echoed in `initialize`; arbitrary older dates and unknown future dates are
-rejected rather than compared lexicographically.
+- The server card at `/.well-known/mcp.json` and
+  `/.well-known/mcp/server-card.json` reports `supportedProtocolVersions`,
+  every version this server speaks, newest first.
 
 ## Automatic project context
 
-Initialization automatically loads bounded root project instructions from
-`AGENTS.md`, `AGENTS.MD`, `CLAUDE.md`, and `CLAUDE.MD` when present. The content
-is included in the MCP `instructions` field, so an agent does not need an
-`open_workspace` call. Nested instruction files are indexed by path but are not
-eagerly injected. Loading is UTF-8 safe and bounded by file-count, scan-count,
-depth, per-file, and total-byte limits.
+The server loads bounded root project instructions from `AGENTS.md`,
+`AGENTS.MD`, `CLAUDE.md`, and `CLAUDE.MD` when present. The content is returned
+in the `instructions` field of `initialize` and of `server/discover`, so an
+agent of either era does not need an `open_workspace` call. Nested instruction
+files are indexed by path but are not eagerly injected. Loading is UTF-8 safe
+and bounded by file-count, scan-count, depth, per-file, and total-byte limits.
 
 ## Workspace and patch guarantees
 
-- One server runtime owns one canonical workspace root.
-- Direct path inputs are workspace-relative. Absolute paths, `..` traversal,
-  NUL bytes, and symlink escapes are rejected.
-- `apply_patch` parses and validates every operation before committing.
+- One server runtime owns one canonical workspace root and serves every client
+  of it. Concurrent clients share the command pool, the retained output, and
+  the patch baselines; this is a single trust domain by design.
+- Direct path inputs are workspace-relative and always resolve against the
+  workspace root. Absolute paths, `..` traversal, NUL bytes, and symlink
+  escapes are rejected.
+- `apply_patch` parses and validates every operation before committing, under a
+  lock that spans every client, so two clients patching one file cannot lose
+  an update: the later one is answered with a conflict rather than silently
+  overwriting.
 - Every replacement is prepared and fsynced in the target directory, then
   installed with `os.replace`.
 - Existing mode bits, UTF-8 BOMs, and CRLF/LF style are preserved. Moves inherit
@@ -114,7 +250,7 @@ Tool failures keep the same envelope with `isError: true`, a readable error in
 Known tool error codes include:
 
 ```json
-["ABSOLUTE_PATH_DENIED", "BINARY_FILE", "ELICITATION_UNSUPPORTED", "GIT_ERROR", "INTERNAL_ERROR", "INVALID_ARGUMENT", "IS_DIRECTORY", "NOT_A_DIRECTORY", "NOT_FOUND", "OUTPUT_TOO_LARGE", "PATCH_CONFLICT", "PATCH_CONTEXT_AMBIGUOUS", "PATCH_CONTEXT_NOT_FOUND", "PATCH_FAILED", "PATCH_HUNKS_OVERLAP", "PATCH_ROLLBACK_FAILED", "PATH_OUTSIDE_WORKSPACE", "PERMISSION_REQUIRED", "RUNTIME_DIR_UNWRITABLE", "SANDBOX_UNAVAILABLE", "COMMAND_CLOSED", "COMMAND_LIMIT_REACHED", "COMMAND_NOT_FOUND", "SYMLINK_ESCAPE", "TTY_UNSUPPORTED", "UNSUPPORTED_ENCODING"]
+["ABSOLUTE_PATH_DENIED", "BINARY_FILE", "COMMAND_CLOSED", "COMMAND_LIMIT_REACHED", "COMMAND_NOT_FOUND", "ELICITATION_UNSUPPORTED", "GIT_ERROR", "INTERNAL_ERROR", "INVALID_ARGUMENT", "IS_DIRECTORY", "NOT_A_DIRECTORY", "NOT_FOUND", "OUTPUT_TOO_LARGE", "PATCH_CONFLICT", "PATCH_CONTEXT_AMBIGUOUS", "PATCH_CONTEXT_NOT_FOUND", "PATCH_FAILED", "PATCH_HUNKS_OVERLAP", "PATCH_ROLLBACK_FAILED", "PATH_OUTSIDE_WORKSPACE", "PERMISSION_REQUIRED", "RUNTIME_DIR_UNWRITABLE", "SANDBOX_UNAVAILABLE", "SYMLINK_ESCAPE", "TTY_UNSUPPORTED", "UNSUPPORTED_ENCODING"]
 ```
 
 Error categories are `validation`, `security`, `permission`, `runtime`,
@@ -122,7 +258,8 @@ Error categories are `validation`, `security`, `permission`, `runtime`,
 
 Malformed JSON-RPC uses standard protocol errors: parse `-32700`, invalid
 request `-32600`, unknown method `-32601`, invalid params/tool `-32602`, and
-unexpected server failure `-32603`.
+unexpected server failure `-32603`. The two codes the modern era adds are
+`-32020` and `-32022`, described above.
 
 ## Command lifecycle
 
@@ -147,10 +284,14 @@ Its offsets are absolute and independent for stdout and stderr. A single
 truncated stream is selected by `next_action`; when both streams are truncated,
 `next_actions` contains one executable `read_output` call for each stream.
 
-Active processes, completed-output commands, per-command bytes, and total
-runtime bytes are bounded. Completed commands have a TTL. POSIX `tty=true` uses
-a real pseudo-terminal; Windows reports `TTY_UNSUPPORTED` in this build instead
-of pretending pipes are a TTY.
+A command belongs to the workspace, not to the client or the request that
+started it. Any authenticated client of the same workspace can continue, read,
+or terminate one with its `command_id`, and no transport event — a closed HTTP
+response, a cancelled request, a reconnect — ends it. Active processes,
+completed-output commands, per-command bytes, and total runtime bytes are
+bounded, all of them per workspace rather than per client. Completed commands
+have a TTL. POSIX `tty=true` uses a real pseudo-terminal; Windows reports
+`TTY_UNSUPPORTED` in this build instead of pretending pipes are a TTY.
 
 ## HTTP authentication
 
@@ -161,6 +302,10 @@ redirect URI matching, one-time five-minute codes, 24-hour access tokens, and
 RFC 7591 dynamic client registration at `POST /oauth/register`. Public and
 confidential clients are bound to their registered authentication method.
 
+Authentication admits a client to the workspace; it does not partition it.
+Every admitted client of one workspace shares that workspace's commands,
+retained output, and patch state.
+
 Dynamic registrations and authorization codes are process-local; restarting
 the server requires clients to register again. Configure a stable
 `CODING_TOOLS_MCP_OAUTH_TOKEN_SECRET` and public server URL only when tokens must
@@ -169,7 +314,7 @@ survive tunnel churn. Forwarded headers are ignored unless
 
 ## Stable tool inventory
 
-The default catalog has 20 tools, including `view_image`. Setting
+The default catalog has 18 tools, including `view_image`. Setting
 `CODING_TOOLS_MCP_ENABLE_VIEW_IMAGE=0` is the sole installation capability gate
 and removes only that optional binary-content tool. It is not a tool profile.
 
@@ -185,8 +330,12 @@ Inputs: none.
 
 Annotations: `{"title":"Server info","readOnlyHint":true,"destructiveHint":false,"idempotentHint":true,"openWorldHint":false}`.
 
-Returns server version, protocol, workspace, cwd, fixed tool count, auth state,
-permission mode, runtime directories, project-context metadata, and exec policy.
+Returns server version, `supported_protocol_versions`, workspace, fixed tool
+count, auth state, permission mode, runtime directories, project-context
+metadata, exec policy, and the static retained-output budget. It reports no
+per-session value and no runtime counter: there is no session, and how often a
+budget was hit is a property of the process rather than an answer to whichever
+client asked. Those counters travel with telemetry.
 
 ### check_exec_environment
 
@@ -196,27 +345,6 @@ Annotations: `{"title":"Check exec environment","readOnlyHint":true,"destructive
 
 Returns lightweight policy and Landlock status without running active probes.
 
-### get_default_cwd
-
-Inputs: none.
-
-Annotations: `{"title":"Get default cwd","readOnlyHint":true,"destructiveHint":false,"idempotentHint":true,"openWorldHint":false}`.
-
-Returns the default cwd for the current MCP transport session. It may reset to
-the workspace root after a reconnect.
-
-### set_default_cwd
-
-Inputs: `"path"`.
-
-Annotations: `{"title":"Set default cwd","readOnlyHint":false,"destructiveHint":false,"idempotentHint":true,"openWorldHint":false}`.
-
-Changes only the current MCP transport session's navigation base; it does not
-modify files. Reliable multi-call workflows should pass `path` or `workdir`
-explicitly instead of depending on this value surviving a reconnect.
-
-Example: `{"path":"src"}`.
-
 ### read_file
 
 Inputs: `"path"`, `"start_line"`, `"end_line"`, `"max_lines"`, `"max_bytes"`, `"encoding"`.
@@ -224,7 +352,8 @@ Inputs: `"path"`, `"start_line"`, `"end_line"`, `"max_lines"`, `"max_bytes"`, `"
 Annotations: `{"title":"Read file","readOnlyHint":true,"destructiveHint":false,"idempotentHint":true,"openWorldHint":false}`.
 
 Reads UTF-8 ranges as a stream, reports full file line/byte metadata, rejects
-binary content, and returns continuation metadata when bounded.
+binary content, and returns continuation metadata when bounded. The
+continuation repeats the workspace-relative path it was given.
 
 ### list_dir
 
@@ -276,6 +405,7 @@ Annotations: `{"title":"Execute command","readOnlyHint":false,"destructiveHint":
 Statuses are `exited`, `running`, `timeout`, `terminated`, or `failed`.
 Launch/policy failures use the error envelope with `status: "failed"`; signal
 exits use `terminated`. Ordinary non-zero exit codes still use `exited`.
+`"workdir"` is workspace-relative and defaults to the workspace root.
 
 Example: `{"cmd":"pytest -q","workdir":".","yield_time_ms":30000}`.
 
@@ -299,7 +429,8 @@ Annotations: `{"title":"Kill command","readOnlyHint":false,"destructiveHint":tru
 Statuses are `["terminated", "killed", "exited", "terminating", "not_found"]`.
 
 If the process is still alive `"wait_ms"` after a non-KILL signal, the runtime
-escalates to a hard kill and waits up to `"kill_wait_ms"` for the exit.
+escalates to a hard kill and waits up to `"kill_wait_ms"` for the exit. This is
+how a client stops a command: `notifications/cancelled` does not.
 
 Example: `{"command_id":"abc","signal":"KILL"}`.
 
@@ -373,10 +504,23 @@ The runtime does not expose external-agent login/accounts, agent memory, cloud
 tasks, web search/fetch, image generation, model routing, plugin installation,
 subagent orchestration, or high-level prompt wrappers.
 
-## Compatibility note for 0.2
+## Known limitation: cancellation responsiveness
 
-0.1 clients that parsed the text block as JSON must switch to
-`structuredContent`. The machine fields are retained where practical, while the
-text block is now a concise human/model summary. Removed compatibility surfaces
-are tool profiles, the `view_image.output` selector, duplicate image data URLs,
-and JSON-RPC batches.
+A cancelled request is answered as this contract says it is, in both eras, but
+the work it started is not stopped any sooner. On stdio the loop is serial, so
+the response is already written by the time a cancellation could be read; over
+HTTP the modern cancellation signal is a closed response stream, and this
+server does not detect a disconnect. No client-observable rule is broken —
+nothing is sent for a cancelled request that would not have been sent anyway —
+but the SHOULD to stop working promptly is not met. The mitigations are the
+30-second foreground window of `exec_command` and terminating a command with
+`kill_command`. Tracked in issue
+[#48](https://github.com/xyTom/coding-tools-mcp/issues/48).
+
+## Compatibility note for 0.3
+
+0.2 clients keep working: the handshake era is unchanged on the wire. What
+changed for them is the tool catalog and the transport, not the envelope —
+`get_default_cwd` and `set_default_cwd` are gone, relative paths resolve
+against the workspace root, and HTTP no longer has sessions. Every removal, and
+what to do instead, is in [migration-0.3.md](migration-0.3.md).

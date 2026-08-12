@@ -1,7 +1,9 @@
 # MCP Client Configuration
 
-Use MCP protocol version `2025-11-25`. Version `2025-06-18` remains supported
-for existing clients.
+Two protocol eras are served at once. A client that speaks `2026-07-28` needs
+no configuration and no handshake: it discovers the server with
+`server/discover` and states its version in every request. A handshake client
+uses `2025-11-25`, and `2025-06-18` remains supported for existing clients.
 
 ## Codex
 

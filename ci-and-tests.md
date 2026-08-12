@@ -87,11 +87,12 @@ make benchmark-real-workloads
 | `make check-dispatch-inputs` | Cloudflare Worker dispatch body compared with the sandbox workflow inputs |
 | `make check-npm-launcher` | npm launcher argument forwarding, runner fallback, exit behavior, and package contents |
 | `make check-release` | Python/module/npm versions and release changelog checked against `RELEASE_TAG`, which defaults from `pyproject.toml` |
-| `make test-mcp-contract` | MCP initialize, `tools/list`, schemas, annotations, structured success/error envelopes, protocol errors |
+| `make test-mcp-contract` | Both protocol eras per method: the handshake, `2026-07-28` `_meta` validation and mirror headers, `tools/list`, schemas, annotations, structured success/error envelopes, protocol errors and their HTTP statuses |
+| `make test-dual-era` | What only shows up with both eras on one server: handshake-era responses carry no modern field, a modern client works without ever handshaking, concurrent clients of either era, workspace races, and the official MCP python SDK driving both transports |
 | `make test-tool-golden` | Golden behavior for read/list/search/patch/exec/stdin/kill/git/image paths |
 | `make test-security` | Traversal, symlink escape, command workdir escape, risky env, shell-expansion gating, Linux Landlock fallback behavior, direct syscall denial where Landlock is available, timeout/watchdog, buffer caps |
 | `make test-e2e` | End-to-end coding loops through the runtime |
-| `make test-runtime-semantics` | Patch/session/image behavior vectors |
+| `make test-runtime-semantics` | Patch/command/image behavior vectors |
 | `make test-docs-required` | Required docs, evidence artifacts, and CI workflow gate checks |
 | `make test-schema-drift` | Live tool schema/annotation names compared against the checked-in runtime contract/docs |
 | `make dogfood-mcp` | Unittest MCP-only dogfood cases |
@@ -100,7 +101,7 @@ make benchmark-real-workloads
 | `make benchmark-smoke` | SWE-bench smoke preflight and placeholder prediction validation |
 | `make benchmark-real-workloads` | MCP runtime smoke over real Python, Node, Rust, Go, and monorepo checkouts plus large file/output and long command cases |
 
-Valid runner suites include `all`, `mcp-contract`, `tool-golden`, `security`, `e2e`, `runtime-semantics`, `dogfood`, `compliance-report`, `docs-required`, and `schema-drift`.
+Valid runner suites include `all`, `mcp-contract`, `dual-era`, `tool-golden`, `security`, `e2e`, `runtime-semantics`, `dogfood`, `compliance-report`, `docs-required`, and `schema-drift`.
 
 ## GitHub Actions
 
@@ -112,7 +113,7 @@ Main workflow:
 
 The main workflow also includes a `windows-msvc-smoke` job. It verifies that
 Windows reports unsupported TTY requests explicitly, force-kills a background
-session without relying on POSIX `SIGKILL`, initializes Visual Studio with
+command without relying on POSIX `SIGKILL`, initializes Visual Studio with
 `vcvarsall.bat x64`, checks the narrow default `core` environment, and confirms
 that `--shell-env-inherit all` can compile and run a single-file `cl.exe` smoke.
 

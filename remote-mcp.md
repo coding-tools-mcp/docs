@@ -110,25 +110,51 @@ configuration; do not rely on the loopback fallback for a production client.
 
 ## HTTP session behavior
 
-An HTTP client initializes without `Mcp-Session-Id`. The response returns a
-new, unguessable session ID. Every later request must send both:
+There are none. Since 0.3.0 this endpoint is stateless: no response carries an
+`Mcp-Session-Id`, an `Mcp-Session-Id` a client kept from an older server is
+ignored rather than refused, and `DELETE /mcp` returns `405` with `Allow: POST`
+because there is nothing to terminate. Every request is answered by the one
+runtime that owns the workspace, so a client may reconnect, change transport,
+or run beside another client without losing anything. Commands are workspace
+resources with their own timeout, count, output, and retention limits: any
+authenticated client of the workspace can continue one with the `command_id`
+that `exec_command` returned.
 
-```text
-Mcp-Session-Id: <returned-id>
-MCP-Protocol-Version: 2025-11-25
+A handshake-era client needs no change for this. It still sends `initialize`,
+still gets the same `InitializeResult`, and simply has no session header to
+echo back.
+
+A `2026-07-28` client sends no handshake at all. Each request states its
+version in `params._meta` and mirrors that version and its method in headers
+(`Mcp-Name` as well, for `tools/call`, `resources/read`, and `prompts/get`):
+
+```bash
+curl "$BASE_URL/mcp" \
+  -H "Authorization: Bearer $CODING_TOOLS_MCP_AUTH_TOKEN" \
+  -H "Accept: application/json, text/event-stream" \
+  -H "Content-Type: application/json" \
+  -H "MCP-Protocol-Version: 2026-07-28" \
+  -H "Mcp-Method: server/discover" \
+  --data '{"jsonrpc":"2.0","id":1,"method":"server/discover","params":{"_meta":{"io.modelcontextprotocol/protocolVersion":"2026-07-28","io.modelcontextprotocol/clientCapabilities":{}}}}'
+
+curl "$BASE_URL/mcp" \
+  -H "Authorization: Bearer $CODING_TOOLS_MCP_AUTH_TOKEN" \
+  -H "Accept: application/json, text/event-stream" \
+  -H "Content-Type: application/json" \
+  -H "MCP-Protocol-Version: 2026-07-28" \
+  -H "Mcp-Method: tools/call" \
+  -H "Mcp-Name: read_file" \
+  --data '{"jsonrpc":"2.0","id":2,"method":"tools/call","params":{"name":"read_file","arguments":{"path":"README.md"},"_meta":{"io.modelcontextprotocol/protocolVersion":"2026-07-28","io.modelcontextprotocol/clientCapabilities":{}}}}'
 ```
 
-Each ID owns separate transport-local state such as the default cwd and request
-context. Commands are workspace resources instead, so another
-authenticated client connected to the same workspace can continue a command
-using the `command_id` returned by `exec_command`. `DELETE /mcp` terminates only
-the selected transport runtime; it does not terminate workspace commands. HTTP
-sessions are bounded and expire after inactivity, while commands keep their own
-existing timeout, count, output, and retention limits.
+A header that contradicts the body, or a missing one, is `400` with `-32020`.
+An unknown method in this era is `404` with `-32601`. Handshake-era errors stay
+`200` with the JSON-RPC error, as they always did.
 
 This implementation returns `405` for `GET /mcp` because it does not provide an
-SSE stream. It rejects JSON-RPC batches and accepts standard
-`notifications/cancelled` messages using `params.requestId`.
+SSE stream. It rejects JSON-RPC batches and accepts `notifications/cancelled`
+in both eras, answering with nothing; the notification does not terminate the
+command the cancelled request started, which `kill_command` does.
 
 ## Local checks
 

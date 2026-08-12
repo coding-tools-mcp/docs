@@ -14,8 +14,8 @@ Dogfood verifies that the MCP server can act as a coding-agent backend through M
 The deterministic runner exercises `server_info`, repo search/read, two
 patch-and-test loops, `git_diff`, a real PTY stdin command, `kill_command`, and
 workspace escape denial. The broader compliance suite separately covers every
-catalog tool, timeouts, output paging, `view_image`, binary rejection, HTTP sessions,
-OAuth, and transport edge cases.
+catalog tool, timeouts, output paging, `view_image`, binary rejection, both
+protocol eras, OAuth, and transport edge cases.
 
 The report records completion rate, total elapsed time, tool-call and byte
 counts, first-attempt patch success rate, poll count, all-case pass state, and
@@ -33,7 +33,8 @@ make dogfood-smoke
 
 After fixture setup and server startup, task execution must use only:
 
-- `initialize`
+- `initialize` (the runner is a handshake-era client; since 0.3.0 the server
+  serves the other two without it)
 - `tools/list`
 - `tools/call`
 

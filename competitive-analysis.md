@@ -6,15 +6,15 @@ selection, approvals, compaction, planning, and UI. Therefore tool-contract
 quality can be compared directly; end-to-end agent parity cannot be claimed
 from MCP unit tests alone.
 
-| Concern | This runtime in 0.2 | Practical comparison |
+| Concern | This runtime in 0.3 | Practical comparison |
 | --- | --- | --- |
 | Tool choice | One stable catalog of 18 low-level coding tools; no profiles or dynamic process tools | A fixed catalog reduces discovery and routing variance, but a host agent can still add its own tools |
 | Editing | `apply_patch` is the sole direct mutation primitive; it stages all files, checks baselines, preserves mode/BOM/newlines, and rolls back partial commits | A whole-file `edit_file` can be simpler for a model, while patching sends fewer unchanged bytes and gives stronger conflict/rollback behavior |
 | Results | Concise bounded `content`, complete `structuredContent`, image bytes once | Avoids paying model context for duplicated JSON, diffs, and base64 |
 | Commands | Ten-second default foreground yield; fixed `write_stdin`, `read_output`, and `kill_command`; bounded commands and real POSIX PTY | Short tests normally finish in one call; background/interactive work has explicit next actions |
-| Project context | Root `AGENTS.md`/`CLAUDE.md` content is injected at initialize; nested instruction paths are indexed | Removes a separate workspace-opening call without injecting every nested rule into every task |
+| Project context | Root `AGENTS.md`/`CLAUDE.md` content is returned in the `instructions` of `initialize` and `server/discover`; nested instruction paths are indexed | Removes a separate workspace-opening call without injecting every nested rule into every task |
 | Isolation | Workspace path checks, permission modes, environment filtering, process groups, output limits, and Linux Landlock where available | MCP annotations remain hints; enforcement is server-side |
-| Transport | Independent HTTP runtimes, negotiated protocol versions, bounded sessions, OAuth DCR + PKCE, bearer auth, and stdio | Suitable as a reusable backend; it is not an agent UI or account system |
+| Transport | Stateless HTTP and stdio, serving `2026-07-28` and the handshake era from one workspace runtime, with OAuth DCR + PKCE and bearer auth | Suitable as a reusable backend; it is not an agent UI or account system |
 
 Other useful reference patterns remain outside this runtime layer: Claude Code
 combines permissions, hooks, and scoped agent orchestration; Aider emphasizes

@@ -33,18 +33,64 @@ version strings assembled by one function (`coding_tools_mcp/telemetry.py`).
 It is structurally incapable of carrying paths, arguments, or file contents.
 
 Every event carries: package version, OS platform and architecture, Python
-`major.minor`, transport (`stdio`/`http`), permission mode, MCP protocol
-version, the connecting client's `clientInfo` name and version (truncated to
-64 characters), a random per-session id, and the anonymous install id.
+`major.minor`, transport (`stdio`/`http`), permission mode, a random
+per-session id, and the anonymous install id. No client identity and no
+protocol version is carried by every event: one server process answers every
+client of its workspace, so a value recorded once would only ever describe
+whichever client connected first.
 
 | Event | When | Additional properties |
 | --- | --- | --- |
-| `session_start` | MCP `initialize` completes | — |
-| `tool_error` | a tool call fails (max 20 per session) | tool name, error code, duration ms, consecutive-failure count |
+| `session_start` | the first request or notification of the session, `ping` excepted | — |
+| `handshake` | every MCP `initialize` | negotiated protocol version, the client's `clientInfo` name and version |
+| `tool_error` | a tool call fails (max 20 per session) | tool name, error code, duration ms, consecutive-failure count, and for a 2026-07-28 request the `clientInfo` name and version it carried |
 | `tool_summary` | session ends, one per tool used | calls, ok, errors, per-error-code counts, duration buckets, truncation count |
-| `session_end` | session ends | session duration, total calls, distinct tools, dropped error-event count |
+| `session_end` | session ends | session duration, total calls, distinct tools, dropped error-event count, handshake-era and 2026-07-28 request counts, `server/discover` probe count, retained-output eviction and omitted-read counters |
 
 A typical session produces 5–15 events totalling a few kilobytes.
+
+## What a session is
+
+A session is one server process, not one client: every client of a workspace
+is served by the same runtime, and neither protocol era leaves a session
+behind on the server.
+
+- The session is activated by the first request or notification that passes
+  envelope validation, whichever era it belongs to, and before the method
+  runs — so a first call that fails still reports its `tool_error`. A client
+  that never sends `initialize` is measured like any other.
+- `ping` never activates a session. An HTTP health probe against an idle
+  server produces no events at all.
+- `consecutive_failures` on `tool_error` counts consecutive failures of one
+  tool runtime-wide, across every client of the process. It is not a
+  single client's failure streak, and must not be read as one.
+- The 20-error budget per session is likewise a whole-process budget, shared
+  by every client; `session_end` reports how many error events were dropped
+  once it ran out.
+- A long-running HTTP server emits `session_start` once when it first serves
+  a client and `tool_summary`/`session_end` once when it shuts down, however
+  many clients it served in between.
+
+`clientInfo` is whatever a client says it is, so both fields are narrowed to a
+printable ASCII subset and truncated to 40 characters before they can become
+event properties. Only `name` and `version` are read; a handshake-era
+`tool_error` carries no identity at all, because the request that failed did
+not name one.
+
+## First-appearance server log
+
+Independently of telemetry — including when telemetry is off — the server
+writes one line to stderr the first time a process sees each protocol choice,
+so an operator can tell from the log which era their clients actually speak:
+
+```text
+coding-tools-mcp: legacy client handshake (2025-11-25)
+coding-tools-mcp: modern client request (tools/list)
+coding-tools-mcp: server/discover probe
+```
+
+Each line appears at most once per process and only ever on stderr; over
+stdio, stdout is the MCP wire.
 
 ## What is never collected
 

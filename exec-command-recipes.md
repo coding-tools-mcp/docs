@@ -33,9 +33,8 @@ interacts with the process. `read_output` is for paging retained stdout/stderr
 when a result explicitly says output was truncated (or when compact verbosity
 was requested). It is not an extra step for every command.
 
-For remote clients, pass `workdir` explicitly whenever location matters.
-`set_default_cwd` is scoped to one MCP transport session and may reset when a
-client reconnects or initializes again.
+Relative paths always resolve against the workspace root, so pass `workdir`
+explicitly whenever a command must run somewhere else.
 
 Use the external runtime `HOME`, `TMPDIR`, or `cache_dir` reported by `server_info` when you want dependency caches without adding files to the Git worktree. These shell examples assume trusted mode because they use environment expansion:
 

@@ -77,6 +77,9 @@ All operations are parsed and matched before writes. Context must be unique.
 Files are prepared in their destination directories, fsynced, baseline-checked,
 and installed with atomic replacement. Multi-file failure restores prior files.
 Mode bits, BOM, and newline style are preserved; moves inherit source mode.
+Lines are split on `\n` only, so a line containing another Unicode line
+boundary (`\x0c`, `\u2028`, `\x85`, …) is one line to both the file and the
+patch. A file's final newline is an ordinary line the hunk can add or remove.
 
 ## Model-ready examples
 

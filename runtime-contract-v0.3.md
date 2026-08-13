@@ -279,6 +279,17 @@ Tool failures keep the same envelope with `isError: true`, a readable error in
 }
 ```
 
+A client that forwards only `content` to the model must still be able to tell
+a transient failure from a permanent one, so the error text restates the
+category and retryability under the code and message, and a terminal failure
+says so outright:
+
+```text
+COMMAND_NOT_FOUND: Command not found; stdin access denied.
+Category: not_found. Retryable: no. Do not repeat this call unchanged.
+Retry: This command_id has expired or never existed; …
+```
+
 Known tool error codes include:
 
 ```json

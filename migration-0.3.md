@@ -114,9 +114,9 @@ that protocol states its version per request and is never negotiated.
 **A missing `MCP-Protocol-Version` header is read as `2025-11-25`.** The older
 spec suggests assuming `2025-03-26` for a request without the header, but this
 server has never spoken `2025-03-26`, and answering as if it did would name a
-version in the echo that no client could then use. The header value only
-selects what is echoed and recorded; it never changes what a method does. Send
-the header and this does not arise.
+version no client could then use. The header value travels with the request as
+context and nothing echoes it, records it, or acts on it; no method behaves
+differently for it. Send the header and this does not arise.
 
 **Legacy results gained nothing.** The fields `2026-07-28` adds — `resultType`,
 `_meta.io.modelcontextprotocol/serverInfo`, `ttlMs`, `cacheScope` — appear only
@@ -136,9 +136,15 @@ support both:
   `initialize`, which works.
 - Over HTTP, a modern request must mirror its body in `MCP-Protocol-Version`
   and `Mcp-Method`, plus `Mcp-Name` for the methods that name a subject
-  (`tools/call`, `resources/read`, `prompts/get`). A mismatch or a missing
-  mirror header is `400` with `-32020`. Handshake-era requests are asked for
-  none of this.
+  (`tools/call`, `resources/read`, `prompts/get`). A mismatch, a missing
+  mirror header, or one sent twice is `400` with `-32020`. Handshake-era
+  requests are asked for none of this.
+- Falling back to the handshake means dropping the header as well. Do **not**
+  send `MCP-Protocol-Version: 2026-07-28` on an `initialize`, or on any other
+  body that carries no modern `_meta`: the header states which era the request
+  is in, so one that disagrees with the body is a mirror violation and is
+  refused with `-32020` before the handshake is read. Send the handshake
+  version, or no header at all.
 
 ## Compliance statement
 

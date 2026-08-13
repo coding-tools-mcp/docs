@@ -71,9 +71,11 @@ behind on the server.
   a client and `tool_summary`/`session_end` once when it shuts down, however
   many clients it served in between.
 
-`clientInfo` is whatever a client says it is, so both fields are narrowed to a
-printable ASCII subset and truncated to 40 characters before they can become
-event properties. Only `name` and `version` are read; a handshake-era
+`client_name` and `client_version` are sanitized self-reported labels, not
+identity. `clientInfo` is whatever a client says it is, so each field is
+narrowed to letters, digits, spaces, and `. _ -` — dropping the characters that
+make up an address or a path, so that neither can travel verbatim — and then
+truncated to 40 characters. Only `name` and `version` are read; a handshake-era
 `tool_error` carries no identity at all, because the request that failed did
 not name one.
 

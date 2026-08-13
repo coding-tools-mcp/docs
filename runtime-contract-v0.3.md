@@ -85,8 +85,13 @@ SEP-2243 requires, so a gateway can route it without reading the body:
 - `Mcp-Name` repeats the subject of the methods that name one: `params.name`
   for `tools/call` and `prompts/get`, `params.uri` for `resources/read`. A
   value that cannot travel as an HTTP field is wrapped as
-  `=?base64?<base64 of the UTF-8 value>?=`. No other method takes this header,
-  `server/discover` included.
+  `=?base64?<base64 of the UTF-8 value>?=`, whose payload may not exceed 8192
+  characters. No other method takes this header, `server/discover` included.
+
+Each of the three headers may appear exactly once. A gateway routes on them
+alone, and which of two values it would read is its own business, so a request
+that states its version, method, or subject twice is refused with `-32020`
+rather than resolved.
 
 Handshake-era requests are asked for none of these headers. A
 `MCP-Protocol-Version: 2026-07-28` header over a body that carries no modern
@@ -142,17 +147,42 @@ tool was not.
 
 | Code | Meaning | HTTP status of a `2026-07-28` request |
 | --- | --- | --- |
-| `-32600` | invalid request, or an `MCP-Protocol-Version` header naming a version this server does not know (`data.supported` lists both eras) | `400` |
+| `-32600` | invalid request envelope | `200`, in either era |
 | `-32601` | unknown method | `404` |
 | `-32602` | invalid params, including a missing or mistyped required `_meta` field | `400` |
-| `-32020` | headers do not mirror the body: missing, or contradicting it | `400` |
+| `-32020` | headers do not mirror the body: missing, duplicated, or contradicting it | `400` |
 | `-32022` | `_meta` names a protocol version this server does not speak; `data.supported` lists the modern versions only | `400` |
 | `-32603` | unexpected server failure | `200` |
 | `-32700` | parse error | `400` |
 
-Every handshake-era error stays HTTP `200` with the JSON-RPC error in the body,
-which is the only thing a client of that era reads. `-32002 Server not
-initialized` and `-32001 Unknown MCP session` are never returned by any era.
+The one `-32600` that is not `200` is a transport refusal rather than a verdict
+on a request that was dispatched: a **handshake-era** request whose
+`MCP-Protocol-Version` header names a version from neither era is refused with
+`400` before dispatch, and `data.supported` lists every version this server
+speaks. A `2026-07-28` request is never refused that way, because its body
+settles what the header could not: an unknown version stated by both is
+`-32022`, and a header that contradicts the body is `-32020`.
+
+That order holds generally. What the body says about itself is checked before
+the headers that mirror it, so a request that is wrong in both ways is answered
+with the protocol's verdict — an invalid `_meta` field is `-32602` and an
+unsupported `_meta` version is `-32022` on either transport, never the `-32020`
+the mirror would also have produced.
+
+Every handshake-era error a dispatched request produced stays HTTP `200` with
+the JSON-RPC error in the body, which is the only thing a client of that era
+reads. What the transport rejects before dispatch, in either era, carries its
+own status: `415` for a content type that is not JSON, `411` for a missing
+`Content-Length`, `413` for a body over the maximum size, and `400` for a parse
+error, a JSON-RPC batch, or the unknown version header above. `-32002 Server
+not initialized` and `-32001 Unknown MCP session` are never returned by any
+era.
+
+A notification — a message with no `id` — is answered with nothing whatever
+goes wrong inside it: over HTTP with an empty `202`, over stdio with silence.
+The mirror headers are the exception, because they are a transport contract
+rather than a verdict on the message: a notification whose headers do not
+mirror its body is still refused with `400` and `-32020`.
 
 ### Transports
 
@@ -161,8 +191,10 @@ initialized` and `-32001 Unknown MCP session` are never returned by any era.
   stream, `GET /mcp` and `HEAD /mcp` return `405` as well.
 - A request without an `MCP-Protocol-Version` header is treated as
   `2025-11-25`, this server's newest handshake version. The older spec suggests
-  assuming `2025-03-26`, a version this server does not speak; the value only
-  selects what is echoed and recorded, never what a method does.
+  assuming `2025-03-26`, a version this server does not speak. The header value
+  travels with the request as context and is available to the runtime; nothing
+  echoes it, records it, or acts on it, and no method behaves differently for
+  it.
 - JSON-RPC batches are rejected.
 - `notifications/cancelled` is accepted in both eras and answered with nothing,
   but it does not terminate the command the cancelled request started. A

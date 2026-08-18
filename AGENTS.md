@@ -2,6 +2,8 @@
 
 Use one authoritative home for each fact. Prefer links over duplicated long-form explanations.
 
+Start with `docs/README.md` when locating documentation by topic. Existing document paths are intentionally kept stable; organize navigation through the index before moving published files.
+
 ## Documentation roles
 
 - Root `README.md` / `README.zh-CN.md`: product overview, quick entry points, and navigation.

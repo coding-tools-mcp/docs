@@ -51,11 +51,15 @@ A typical session produces 5–15 events totalling a few kilobytes.
 
 In `tool_summary`, `ok` means successful operations, not merely calls that
 dispatched successfully: it is `calls - errors - operation_failures`.
-`operation_failures` counts successfully dispatched commands whose terminal
-outcome was `exited_nonzero`, `timeout`, or `signal`; a `spawn_error` remains a
-tool error and is not counted twice. Each `outcome_*` property counts the named
-operation outcome. A terminal command outcome is counted only on its first
-observation, however many later polls report it again.
+`operation_failures` on `exec_command` counts successfully dispatched commands
+whose terminal outcome was `exited_nonzero`, `timeout`, or `signal`; a
+`spawn_error` remains a tool error and is not counted twice. A background
+command's terminal outcome stays attributed to the `exec_command` that launched
+it even when `write_stdin`, `read_output`, or `kill_command` is the first call
+to observe that outcome. Those observer calls remain successful unless the
+calls themselves fail. Each `outcome_*` property counts the named operation
+outcome. A terminal command outcome is counted only on its first observation,
+however many later polls report it again.
 
 ## What a session is
 

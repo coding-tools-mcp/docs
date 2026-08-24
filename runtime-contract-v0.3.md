@@ -293,11 +293,23 @@ Retry: This command_id has expired or never existed; …
 Known tool error codes include:
 
 ```json
-["ABSOLUTE_PATH_DENIED", "BINARY_FILE", "COMMAND_CLOSED", "COMMAND_LIMIT_REACHED", "COMMAND_NOT_FOUND", "ELICITATION_UNSUPPORTED", "GIT_ERROR", "INTERNAL_ERROR", "INVALID_ARGUMENT", "IS_DIRECTORY", "NOT_A_DIRECTORY", "NOT_FOUND", "OUTPUT_TOO_LARGE", "PATCH_CONFLICT", "PATCH_CONTEXT_AMBIGUOUS", "PATCH_CONTEXT_NOT_FOUND", "PATCH_FAILED", "PATCH_HUNKS_OVERLAP", "PATCH_ROLLBACK_FAILED", "PATH_OUTSIDE_WORKSPACE", "PERMISSION_REQUIRED", "RUNTIME_DIR_UNWRITABLE", "SANDBOX_UNAVAILABLE", "SYMLINK_ESCAPE", "TTY_UNSUPPORTED", "UNSUPPORTED_ENCODING"]
+["ABSOLUTE_PATH_DENIED", "BINARY_FILE", "COMMAND_CLOSED", "COMMAND_LIMIT_REACHED", "COMMAND_NOT_FOUND", "ELICITATION_UNSUPPORTED", "GIT_ERROR", "INTERNAL_ERROR", "INVALID_ARGUMENT", "IS_DIRECTORY", "NOT_A_DIRECTORY", "NOT_FOUND", "OUTPUT_TOO_LARGE", "PATCH_CONFLICT", "PATCH_CONTEXT_AMBIGUOUS", "PATCH_CONTEXT_NOT_FOUND", "PATCH_FAILED", "PATCH_HUNKS_OVERLAP", "PATCH_ROLLBACK_FAILED", "PATH_OUTSIDE_WORKSPACE", "PERMISSION_REQUIRED", "REPEATED_CALL_BLOCKED", "REVISION_MISMATCH", "REVISION_REQUIRED", "RUNTIME_DIR_UNWRITABLE", "SANDBOX_UNAVAILABLE", "SYMLINK_ESCAPE", "TTY_UNSUPPORTED", "UNSUPPORTED_ENCODING"]
 ```
 
 Error categories are `validation`, `security`, `permission`, `runtime`,
 `not_found`, `conflict`, and `internal`.
+
+### Repeat-failure circuit breaker
+
+A call is fingerprinted by its tool name and its normalized arguments
+(`idempotency_key` excluded, since varying only that changes nothing the
+failure depended on). When the same fingerprint produces the same
+non-retryable error code twice, the third attempt is refused with
+`REPEATED_CALL_BLOCKED` before the handler runs. The second failure already
+warns: its `details` carry `consecutive_identical_failures` and a `breaker`
+note. A success with the same arguments, or any change to the arguments,
+clears the count. Retryable failures — `PATCH_CONFLICT`,
+`COMMAND_LIMIT_REACHED` — never count toward it.
 
 Malformed JSON-RPC uses standard protocol errors: parse `-32700`, invalid
 request `-32600`, unknown method `-32601`, invalid params/tool `-32602`, and
@@ -536,6 +548,11 @@ Annotations: `{"title":"Request permissions","readOnlyHint":true,"destructiveHin
 The current server does not advertise MCP elicitation. This tool therefore
 returns `ELICITATION_UNSUPPORTED`, except that dangerous mode reports the
 operator's explicit auto-grant policy. It never silently escalates safe mode.
+
+Because that answer is fixed outside dangerous mode, `tools/list` advertises
+`request_permissions` only when `permission_mode=dangerous`. The handler stays
+reachable: a client that calls it by name still gets the same answer it always
+got, in every mode. See [migration-0.5.md](migration-0.5.md).
 
 ### view_image
 

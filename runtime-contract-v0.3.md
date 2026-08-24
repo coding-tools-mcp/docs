@@ -423,7 +423,7 @@ cap is known to be exceeded. `context_lines=0` does not reread matching files.
 
 ### apply_patch
 
-Inputs: `"patch"`, `"dry_run"`.
+Inputs: `"patch"`, `"dry_run"`, `"idempotency_key"`.
 
 Annotations: `{"title":"Apply patch","readOnlyHint":false,"destructiveHint":true,"idempotentHint":false,"openWorldHint":false}`.
 
@@ -438,6 +438,12 @@ Supports `*** Add File`, `*** Update File`, `*** Delete File`, and
 +new
 *** End Patch
 ```
+
+Hunk location, grading, idempotency, and the success/failure fields are
+specified once in [tools-and-schemas.md](tools-and-schemas.md#apply_patch).
+Several `*** Update File` blocks naming one path in one envelope chain in
+order: the second sees the first's result. `apply_patch` carries no
+`revision` argument — its context lines are its optimistic check.
 
 ### exec_command
 

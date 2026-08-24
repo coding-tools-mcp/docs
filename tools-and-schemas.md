@@ -73,13 +73,79 @@ count, dimensions, resize metadata, and warnings, but no base64 or data URL.
 *** End Patch
 ```
 
-All operations are parsed and matched before writes. Context must be unique.
-Files are prepared in their destination directories, fsynced, baseline-checked,
-and installed with atomic replacement. Multi-file failure restores prior files.
-Mode bits, BOM, and newline style are preserved; moves inherit source mode.
-Lines are split on `\n` only, so a line containing another Unicode line
-boundary (`\x0c`, `\u2028`, `\x85`, …) is one line to both the file and the
-patch. A file's final newline is an ordinary line the hunk can add or remove.
+All operations are parsed and matched before writes. Files are prepared in
+their destination directories, fsynced, baseline-checked, and installed with
+atomic replacement. Multi-file failure restores prior files. Mode bits, BOM,
+and newline style are preserved; moves inherit source mode. Lines are split on
+`\n` only, so a line containing another Unicode line boundary (`\x0c`,
+`\u2028`, `\x85`, …) is one line to both the file and the patch. A file's
+final newline is an ordinary line the hunk can add or remove.
+
+### Locating a hunk
+
+A hunk has no line numbers; it finds itself by its context, so the context must
+be unique within the file. Two things narrow the search when it is not:
+
+- `@@ <scope>` — the text after `@@` names the enclosing block (`@@ def
+  farewell`). Candidates are grouped by the scope anchor that most closely
+  precedes them; if one group remains, it wins. A unified-diff position header
+  (`@@ -1,4 +1,4 @@`) names line numbers this dialect does not use and reads as
+  no scope.
+- `*** End of File` — placed on its own line inside a hunk, it prefers the
+  placement that reaches the end of the file.
+
+A blank context line may be written as `""` or as a single space; both mean the
+same empty line.
+
+### Graded matching
+
+Context is compared at three grades, in order, and the first grade that
+produces candidates decides the outcome:
+
+| Grade | Comparison | Reported as |
+| --- | --- | --- |
+| exact | byte-for-byte | `match_quality: "exact"` |
+| trailing whitespace | `rstrip()` | `match_quality: "trailing_ws"` |
+| indentation width | `strip()`, plus a uniform indent delta | `match_quality: "indent"` |
+
+Every downgrade is labeled in `match_quality` and repeated as a warning; none
+is silent. Ambiguity is checked at each grade — a fuzzy grade that matches two
+places is `PATCH_CONTEXT_AMBIGUOUS`, never a guess. Context lines are
+reinstated from the file rather than from the patch, so a tolerated whitespace
+difference is preserved instead of being rewritten; added lines under the
+`indent` grade are re-indented by the block's uniform delta, and a delta that
+is not uniform disqualifies the grade rather than being approximated.
+
+### Chaining and idempotency
+
+Several `*** Update File` blocks naming one path in one envelope chain in
+order: each sees the previous block's result. `apply_changes` is the
+declarative counterpart and rejects same-path duplicates instead.
+
+A hunk whose result is already in the file is skipped rather than failing, so
+replaying an envelope after a lost response returns success with
+`already_applied: true` and an `unchanged` operation. An update that changes
+nothing is committed as a baseline assertion, so it does not touch the file's
+mtime. `idempotency_key` goes further: the runtime keeps the last 64 successful
+results per key and replays the recorded one, flagged `idempotent_replay`,
+rather than doing the work twice. Failures are never recorded.
+
+### Success and failure fields
+
+Success returns, per affected file: `revision` (a SHA-256 over the resulting
+UTF-8 bytes — the same token `read_file` publishes and `apply_changes`
+requires), `total_lines`, `changed_ranges` (1-based, inclusive, with locating
+context trimmed off both ends; a pure deletion reports `end_line ==
+start_line - 1`), and `match_quality`.
+
+`PATCH_CONTEXT_NOT_FOUND` and `PATCH_CONTEXT_AMBIGUOUS` carry `hunk_index`,
+`match_count`, `scope`, and numbered file text: `nearby_text` around the
+nearest near-miss for a miss, and `candidate_lines` plus per-candidate excerpts
+for an ambiguity.
+
+`apply_patch` has no `revision` argument. Its context lines are its optimistic
+concurrency check, and a second mechanism on one tool would produce two
+conflicting failure modes.
 
 ## Model-ready examples
 

@@ -201,6 +201,13 @@ commands ordinarily return `status: "exited"` in one call. A still-running
 command returns a `command_id` and a machine-readable `next_action` for
 `write_stdin` with empty `chars`.
 
+Yield time and process lifetime are separate budgets. `yield_time_ms` only
+bounds how long the call waits; `exec_command.timeout_ms` bounds how long the
+process may live and defaults to `300000` (maximum `600000`). A build or test
+run that has not finished when the call returns keeps running until the
+lifetime expires, at which point the runtime kills its process group and the
+command reports `status: "timeout"`.
+
 Only truncated terminal output returns a `read_output` next action by default.
 `output_ref` values are `command:<id>:stdout` or `command:<id>:stderr`; offsets
 are stream-specific absolute byte positions. Runtime limits bound active

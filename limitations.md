@@ -10,6 +10,27 @@
   directories. `apply_patch` keeps same-directory backups and rolls back the
   full staged set, but a storage failure that also prevents rollback is surfaced
   as `PATCH_ROLLBACK_FAILED` and may require operator recovery.
+- `apply_patch` locates a hunk by matching its context lines, so that context
+  must be unique in the file. Matching is graded — exact, then ignoring
+  trailing whitespace, then ignoring indentation width — and the grade used is
+  reported as `match_quality`; there is no similarity-scored fuzzy matching and
+  no line-number fallback. Context that appears twice fails with
+  `PATCH_CONTEXT_AMBIGUOUS` unless a `@@ <scope>` header or `*** End of File`
+  anchor picks one occurrence, and context that appears nowhere fails with
+  `PATCH_CONTEXT_NOT_FOUND`. Both failures carry the hunk index, numbered
+  nearby text, and candidate positions to repair from.
+- The `patch_lock` that serializes `apply_patch` is an in-process mutex. Two
+  server processes on one workspace, an external editor, or a command run
+  through `exec_command` are not excluded by it; the pre-commit baseline
+  recheck detects such a writer and reports `PATCH_CONFLICT`, but the window
+  between recheck and replace is not zero.
+- Retained command output expires. A finished command keeps its output for
+  `COMPLETED_COMMAND_TTL_SECONDS` (300s, reported as `output_retention` in
+  `server_info`) and only the most recent 32 completed commands are kept, so a
+  `command_id` or `output_ref` read late enough answers `COMMAND_NOT_FOUND`.
+  Per-stream retention is head plus rolling tail, so the middle of a very large
+  stream can be evicted while the command is still running; redirect large
+  output to a file and page it with `read_file`.
 - OAuth dynamic client registrations and pending authorization codes are held in
   process memory. Restarting the server requires dynamic clients to register
   again.

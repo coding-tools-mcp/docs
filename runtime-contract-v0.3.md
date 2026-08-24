@@ -224,9 +224,16 @@ and bounded by file-count, scan-count, depth, per-file, and total-byte limits.
   workspace root. Absolute paths, `..` traversal, NUL bytes, and symlink
   escapes are rejected.
 - `apply_patch` parses and validates every operation before committing, under a
-  lock that spans every client, so two clients patching one file cannot lose
-  an update: the later one is answered with a conflict rather than silently
-  overwriting.
+  lock that spans every client of **one server process**, so two clients of that
+  process patching one file cannot lose an update: the later one is answered
+  with a conflict rather than silently overwriting.
+- That lock is an in-process mutex, not a file lock. Two server processes
+  pointed at one workspace do not exclude each other, and neither does an
+  external editor or a command started through `exec_command`. Across
+  processes the only protection is the pre-commit baseline recheck below: a
+  concurrent writer is detected and reported as `PATCH_CONFLICT`, but the
+  detection window is the interval between the recheck and `os.replace`, not
+  zero. Run one server per workspace if you need mutual exclusion.
 - Every replacement is prepared and fsynced in the target directory, then
   installed with `os.replace`.
 - Existing mode bits, UTF-8 BOMs, and CRLF/LF style are preserved. Moves inherit
@@ -468,6 +475,14 @@ Launch/policy failures use the error envelope with `status: "failed"`; signal
 exits use `terminated`. Ordinary non-zero exit codes still use `exited`.
 `"workdir"` is workspace-relative and defaults to the workspace root.
 
+`"yield_time_ms"` and `"timeout_ms"` are two separate budgets.
+`"yield_time_ms"` (default `10000`, maximum `30000`) is how long the call
+waits before returning; a command still running then keeps running under its
+`command_id`. `"timeout_ms"` (default `300000`, maximum `600000`) is the total
+process lifetime, after which the runtime kills the process group whether or
+not the call has already returned. Before v0.5.0 the lifetime defaulted to
+`30000`, so a command that outlived its first return was killed shortly after.
+
 Example: `{"cmd":"pytest -q","workdir":".","yield_time_ms":30000}`.
 
 ### write_stdin
@@ -517,9 +532,17 @@ Annotations: `{"title":"Git status","readOnlyHint":true,"destructiveHint":false,
 
 ### git_diff
 
-Inputs: `"path"`, `"paths"`, `"staged"`, `"unstaged"`, `"context_lines"`, `"max_bytes"`.
+Inputs: `"path"`, `"paths"`, `"staged"`, `"unstaged"`, `"include_untracked"`, `"context_lines"`, `"max_bytes"`.
 
 Annotations: `{"title":"Git diff","readOnlyHint":true,"destructiveHint":false,"idempotentHint":true,"openWorldHint":false}`.
+
+`"include_untracked"` defaults to `true`. Each untracked path reported by
+`git ls-files --others --exclude-standard` is diffed against an empty file and
+appended to the unstaged pass under the same truncation budget, so a file
+created by `*** Add File` is verifiable from `git_diff` alone. At most 100
+untracked files are diffed per call; the overflow is reported in `warnings`.
+Responses echo `include_untracked`. Setting `"unstaged": false` also disables
+the untracked pass.
 
 ### git_log
 

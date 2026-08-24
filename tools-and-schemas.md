@@ -142,13 +142,16 @@ order: each sees the previous block's result. `apply_changes` is the
 declarative counterpart and rejects same-path duplicates instead. Chained
 blocks produce one final `affected_files` record for the resolved path; its
 revision and line count name the committed bytes, and its `changed_ranges`
-accumulate the blocks' changes.
+describe the net difference from the original baseline to those final bytes,
+not a stale accumulation of intermediate block-local ranges.
 
 A hunk whose result is already in the file is skipped rather than failing, so
 replaying an envelope after a lost response returns success with
 `already_applied: true` and an `unchanged` operation. An update that changes
 nothing is committed as a baseline assertion, so it does not touch the file's
-mtime.
+mtime. `*** Move to:` is still a write when it relocates the file, even if all
+of that block's hunks were already present; such a result reports
+`already_applied: false` and an operation of `move`.
 
 That claim turns a miss into a success, so it takes locatable evidence: the
 hunk's `new` block has to be found at the `exact` or `trailing_ws` grade, and
@@ -161,14 +164,15 @@ unique inside the hunk's `@@` scope and `*** End of File` constraint. A result
 made only of blank lines is never evidence: every newline-terminated file has
 a trailing empty element in the patcher's line model.
 
-`idempotency_key` goes further: the runtime keeps the last 64 successful
-results per key and replays the recorded one, flagged `idempotent_replay`,
-rather than doing the work twice. A key names one request. It is recorded with
-a fingerprint of the arguments that produced it, and reusing it for anything
-else — a different patch, a different `dry_run` — is `IDEMPOTENCY_KEY_REUSED`
-rather than a replay of work that was never done for those arguments. Failures
-are never recorded, and neither is a dry run: it changed nothing, so it must
-never answer a later real apply.
+`idempotency_key` goes further: the runtime keeps one 64-entry
+least-recently-used cache across both write tools, keyed by `(tool, key)`, and
+replays the recorded result, flagged `idempotent_replay`, rather than doing the
+work twice. An evicted key does the work again. A key names one request. It is
+recorded with a fingerprint of the arguments that produced it, and reusing it
+for anything else — a different patch, a different `dry_run` — is
+`IDEMPOTENCY_KEY_REUSED` rather than a replay of work that was never done for
+those arguments. Failures are never recorded, and neither is a dry run: it
+changed nothing, so it must never answer a later real apply.
 
 ### Success and failure fields
 

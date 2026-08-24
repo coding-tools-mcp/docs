@@ -315,13 +315,16 @@ countable error code twice, the third attempt is refused with
 `REPEATED_CALL_BLOCKED` before the handler runs. The second failure already
 warns: its `details` carry `consecutive_identical_failures` and a `breaker`
 note. A success with the same arguments, or any change to the arguments, gives
-the revised call a fresh budget. Any successful `apply_patch` or
-`apply_changes` clears all verdicts because the tree changed. The first terminal
-observation of each command from `exec_command`, `write_stdin`, `read_output`,
-or `kill_command` does the same whenever that command could have written to the
-tree: in unrestricted mode, under an unenforced structured-only policy, or
-through a configured structured-only write path. Later observations of the
-same completed command do not reset the breaker again.
+the revised call a fresh budget. A successful non-dry-run `apply_patch` or
+`apply_changes` clears all verdicts when it wrote, moved, copied, or deleted
+something; an already-applied result does not. The first terminal observation
+of each `command_id` from `exec_command`, `write_stdin`, `read_output`, or
+`kill_command` does the same whenever that particular command could have
+written to the tree: in unrestricted mode, under an unenforced structured-only
+policy, through a configured structured-only write path, or because its
+Landlock setup failed open and it ran unrestricted despite advertised host
+support. Later observations of the same completed command do not reset the
+breaker again.
 
 Countable means the repeat cannot work. Non-retryable failures count except
 `IDEMPOTENCY_KEY_REUSED`: that error specifically tells the caller to choose a

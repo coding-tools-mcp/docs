@@ -474,6 +474,67 @@ Several `*** Update File` blocks naming one path in one envelope chain in
 order: the second sees the first's result. `apply_patch` carries no
 `revision` argument — its context lines are its optimistic check.
 
+### apply_changes
+
+Inputs: `"changes"`, `"dry_run"`, `"idempotency_key"`.
+
+Annotations: `{"title":"Apply changes","readOnlyHint":false,"destructiveHint":true,"idempotentHint":false,"openWorldHint":false}`.
+
+Line-addressed sibling of `apply_patch`, committed through the same staging,
+baseline-recheck, and rollback machinery, and returning the same result shape.
+Nothing has to match: edits name line numbers instead of context.
+
+Each entry of `changes` carries an `action`, a `path`, and, for every action
+except `create`, the `revision` `read_file` published for that path:
+
+| action | requires | notes |
+| --- | --- | --- |
+| `create` | `content` | the path must not exist; `revision` is rejected |
+| `write` | `content`, `revision` when the path exists | upsert of the whole file |
+| `edit` | `edits`, `revision` | line operations, below |
+| `delete` | `revision` | file only, never a directory |
+| `move` | `destination`, `revision` | destination must not exist |
+| `copy` | `destination`, `revision` | source is verified, not written |
+
+`revision` is the SHA-256 of the file's UTF-8 bytes, identical to the value
+`read_file` and `apply_patch` report. A missing one is `REVISION_REQUIRED`; a
+stale one is `REVISION_MISMATCH`. Both carry the current revision, and both are
+retryable only after re-reading the file — a byte-identical retry is refused by
+the repeat-failure breaker. `apply_patch` deliberately has no equivalent check.
+
+Each entry of `edits` is one of:
+
+- `{"op": "replace", "start_line": n, "end_line": m, "content": "…"}`
+- `{"op": "delete", "start_line": n, "end_line": m}`
+- `{"op": "insert_after", "line": n, "content": "…"}` where `n` is in
+  `[0, total_lines]` and `0` inserts at the beginning
+- `{"op": "insert_before", "line": n, "content": "…"}` where `n` is in
+  `[1, total_lines + 1]` and `total_lines + 1` appends
+
+`end_line` is inclusive and defaults to `start_line`. Every line number refers
+to the file as `read_file` reported it, never to the result of an earlier edit
+in the same call, so the caller does not track its own shifts. Two edits that
+address the same lines — including two insertions at one point — are
+`PATCH_HUNKS_OVERLAP`. A line number past the end is `INVALID_ARGUMENT` with
+the file's `total_lines` in `details`.
+
+`content` is whole lines. `""` is **zero** lines, which is what makes `replace`
+with empty content a deletion; a trailing newline adds a blank line, so
+`"a\n"` is the two lines `a` and the empty line after it. There are no
+intra-line spans.
+
+A path may appear once per call, as `path` or as `destination`; a duplicate is
+`INVALID_ARGUMENT`. Chaining several edits onto one file is `apply_patch`'s
+imperative territory. An empty `changes` array fails exactly as an empty patch
+does, with `PATCH_FAILED` and "No files were modified."
+
+The binding size limit is the 1 MiB HTTP request cap, not a change count. At
+most 100 changes and 200 edits per change are accepted as a guard against
+pathological input; roughly 20 files per call is the practical advice. A change
+whose result equals the file's current bytes is reported as `unchanged`, is
+committed as a baseline assertion rather than a rewrite, and sets
+`already_applied` when every change in the call is unchanged.
+
 ### exec_command
 
 Inputs: `"cmd"`, `"workdir"`, `"cwd"`, `"timeout_ms"`, `"yield_time_ms"`, `"max_output_bytes"`, `"verbosity"`, `"preview_bytes"`, `"stdin"`, `"tty"`, `"env"`.

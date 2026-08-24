@@ -6,8 +6,8 @@ properties, annotations, and error codes with the contract.
 
 ## Fixed inventory
 
-The registry holds exactly 18 tools. Two are gated, so a default `tools/list`
-advertises 17:
+The registry holds exactly 19 tools. Two are gated, so a default `tools/list`
+advertises 18:
 
 - `server_info`: server, workspace, automatic project context, policy, runtime,
   auth, protocol, and fixed-catalog metadata.
@@ -18,6 +18,8 @@ advertises 17:
   controls.
 - `search_text`: literal or regex search; ripgrep stops after the result cap.
 - `apply_patch`: stage and atomically commit add/update/delete/move envelopes.
+- `apply_changes`: line-addressed create/write/edit/delete/move/copy against a
+  known file revision.
 - `exec_command`: run a bounded command and wait up to 10 seconds by default.
 - `write_stdin`: poll or interact with a running command.
 - `kill_command`: terminate one runtime-owned command.
@@ -42,7 +44,7 @@ Two gates apply, and they are not tool profiles:
   stays reachable by name in every mode, so removing it from the catalog does
   not break a client that calls it anyway.
 
-The remaining 16 tools are always advertised, and `listChanged` is `false`.
+The remaining 17 tools are always advertised, and `listChanged` is `false`.
 
 Each tool declares its own `outputSchema` naming the fields it actually
 returns — `command_id`, `exit_code`, `output_ref`, `revision`,

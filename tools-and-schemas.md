@@ -139,7 +139,10 @@ is not uniform disqualifies the grade rather than being approximated.
 
 Several `*** Update File` blocks naming one path in one envelope chain in
 order: each sees the previous block's result. `apply_changes` is the
-declarative counterpart and rejects same-path duplicates instead.
+declarative counterpart and rejects same-path duplicates instead. Chained
+blocks produce one final `affected_files` record for the resolved path; its
+revision and line count name the committed bytes, and its `changed_ranges`
+accumulate the blocks' changes.
 
 A hunk whose result is already in the file is skipped rather than failing, so
 replaying an envelope after a lost response returns success with
@@ -153,7 +156,10 @@ the hunk must carry either a context line — which sits inside `new` and so
 anchors the block where the hunk belonged — or a multi-line addition. A hunk
 with no context whose single added line is some common line (`pass`,
 `return None`) is not evidence of anything, and fails with
-`PATCH_CONTEXT_NOT_FOUND` and its repair data instead.
+`PATCH_CONTEXT_NOT_FOUND` and its repair data instead. The evidence must be
+unique inside the hunk's `@@` scope and `*** End of File` constraint. A result
+made only of blank lines is never evidence: every newline-terminated file has
+a trailing empty element in the patcher's line model.
 
 `idempotency_key` goes further: the runtime keeps the last 64 successful
 results per key and replays the recorded one, flagged `idempotent_replay`,

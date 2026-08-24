@@ -64,14 +64,18 @@ default** because it breaks every command that writes into the tree —
 `pytest`'s caches, `__pycache__`, `npm`, `cargo`, `gradle`, and `git` itself —
 unless each of those directories is listed with `--write-path`. `--write-path`
 is repeatable, is workspace-relative, only applies in `structured-only`, and
-silently drops any entry that escapes the workspace root.
+silently drops any entry that escapes the workspace root. A valid in-workspace
+directory is created if missing before Landlock rules are installed; a path
+that cannot be created is an explicit error rather than a silently skipped
+allowlist entry.
 `CODING_TOOLS_MCP_WORKSPACE_MUTATION` and an `os.pathsep`-separated
 `CODING_TOOLS_MCP_WRITE_PATHS` are equivalent.
 
-Where Landlock is unavailable — a non-Linux host, an old kernel, or
-`--permission-mode dangerous` — the mode cannot be enforced. It is then
-reported with `"enforced": false` in `server_info.workspace_mutation_policy`
-and in `check_exec_environment`, and the server prints a startup warning,
+Full enforcement requires Landlock ABI 3 or newer: ABIs 1–2 cannot deny file
+truncation. Where that support is unavailable — a non-Linux host, an old
+kernel, or `--permission-mode dangerous` — the mode is reported with
+`"enforced": false` and a warning in `server_info.workspace_mutation_policy`
+and in `check_exec_environment`; the server also prints a startup warning,
 rather than claiming a restriction that is not in force.
 
 ## Client-Side Annotation Gates

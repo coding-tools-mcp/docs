@@ -68,15 +68,18 @@ commands.
 ### `apply_changes`
 
 A new tool for line-addressed editing: you name an action (`create`, `write`,
-`edit`, `delete`, `move`, `copy`), a path, and the `revision` `read_file`
-reported. Nothing has to match textually, and a file that changed since you
-read it is refused with `REVISION_MISMATCH` rather than silently overwritten.
+`edit`, `delete`, `move`, `copy`) and a path. Existing files also use the
+`revision` `read_file` reported. Nothing has to match textually, and a file
+that changed since you read it is refused with `REVISION_MISMATCH` rather than
+silently overwritten.
 
-`revision` is required for every action except `create`, which rejects it. A
-path may appear once per call; chaining several edits onto one file is
-`apply_patch`'s territory. See the contract for the full semantics, including
-the line-content rules (`""` is zero lines; a trailing newline adds a blank
-line) and the `insert_after` / `insert_before` boundaries.
+`write` remains an upsert: it requires `revision` when its path exists and may
+omit it when creating a missing path. `create` rejects `revision` and asserts
+absence; `edit`, `delete`, `move`, and `copy` require it. A path may appear once
+per call; chaining several edits onto one file is `apply_patch`'s territory.
+See the contract for the full semantics, including the line-content rules
+(`""` is zero lines; a trailing newline adds a blank line) and the
+`insert_after` / `insert_before` boundaries.
 
 ### `apply_patch` recovery
 
@@ -94,13 +97,15 @@ line) and the `insert_after` / `insert_before` boundaries.
   of failing, provided the hunk's result is locatable: an exact or
   trailing-whitespace match of a block that carries a context line, or a
   multi-line addition. A context-free single line found somewhere in the file
-  is a coincidence and still fails.
+  is a coincidence and still fails. Evidence must also be non-blank, unique,
+  and inside the hunk's `@@` scope and EOF constraints.
 - `apply_patch` and `apply_changes` accept an optional `idempotency_key`. A
   replay of the same key with the same arguments returns the recorded result
   instead of doing the work twice; reusing the key for different arguments is
   `IDEMPOTENCY_KEY_REUSED`, and a `dry_run` result is never recorded.
 - Several `*** Update File` blocks naming one path in one envelope chain in
-  order. This already worked; it is now promised and tested.
+  order. This already worked; it is now promised and tested. Their result has
+  one final per-path evidence record with accumulated changed ranges.
 
 ### `git_diff` includes untracked files
 
@@ -124,14 +129,19 @@ Both are also settable as `CODING_TOOLS_MCP_WORKSPACE_MUTATION` and an
 including whether it is actually enforced, is reported in `server_info` as
 `workspace_mutation_policy`. See
 [permission-modes.md](permission-modes.md).
+Full enforcement requires Landlock ABI 3 or newer because ABIs 1–2 cannot deny
+truncate. Missing in-workspace `--write-path` directories are created before
+the policy is reported or installed.
 
 ## Behavior changes that need no action
 
 - **Repeat-failure circuit breaker.** The third byte-identical call that would
   produce the same deterministic error is refused with `REPEATED_CALL_BLOCKED`
-  instead of failing the same way again. Changing any argument clears it, and a
-  successful `apply_patch` or `apply_changes` clears it entirely, since the
-  workspace state that made the call impossible has changed.
+  instead of failing the same way again. Changing an argument gives that call a
+  fresh budget. A successful `apply_patch` or `apply_changes` clears the breaker
+  entirely, as does a terminal `exec_command` in unrestricted workspace mode,
+  since the workspace state that made the call impossible may have changed.
+  `IDEMPOTENCY_KEY_REUSED` does not count because its recovery is a new key.
 - **Telemetry counts operations truthfully.** A command that exits nonzero,
   times out, or dies on a signal is no longer recorded as a successful tool
   call, and its terminal outcome is counted once however many times the command

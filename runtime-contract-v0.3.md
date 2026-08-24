@@ -300,7 +300,7 @@ Retry: This command_id has expired or never existed; …
 Known tool error codes include:
 
 ```json
-["ABSOLUTE_PATH_DENIED", "BINARY_FILE", "COMMAND_CLOSED", "COMMAND_LIMIT_REACHED", "COMMAND_NOT_FOUND", "ELICITATION_UNSUPPORTED", "GIT_ERROR", "IDEMPOTENCY_KEY_REUSED", "INTERNAL_ERROR", "INVALID_ARGUMENT", "IS_DIRECTORY", "NOT_A_DIRECTORY", "NOT_FOUND", "OUTPUT_TOO_LARGE", "PATCH_CONFLICT", "PATCH_CONTEXT_AMBIGUOUS", "PATCH_CONTEXT_NOT_FOUND", "PATCH_FAILED", "PATCH_HUNKS_OVERLAP", "PATCH_ROLLBACK_FAILED", "PATH_OUTSIDE_WORKSPACE", "PERMISSION_REQUIRED", "REPEATED_CALL_BLOCKED", "REVISION_MISMATCH", "REVISION_REQUIRED", "RUNTIME_DIR_UNWRITABLE", "SANDBOX_UNAVAILABLE", "SYMLINK_ESCAPE", "TTY_UNSUPPORTED", "UNSUPPORTED_ENCODING"]
+["ABSOLUTE_PATH_DENIED", "BINARY_FILE", "COMMAND_CLOSED", "COMMAND_LIMIT_REACHED", "COMMAND_NOT_FOUND", "COMMAND_SPAWN_FAILED", "ELICITATION_UNSUPPORTED", "GIT_ERROR", "IDEMPOTENCY_KEY_REUSED", "INTERNAL_ERROR", "INVALID_ARGUMENT", "IS_DIRECTORY", "NOT_A_DIRECTORY", "NOT_FOUND", "OUTPUT_TOO_LARGE", "PATCH_CONFLICT", "PATCH_CONTEXT_AMBIGUOUS", "PATCH_CONTEXT_NOT_FOUND", "PATCH_FAILED", "PATCH_HUNKS_OVERLAP", "PATCH_ROLLBACK_FAILED", "PATH_OUTSIDE_WORKSPACE", "PERMISSION_REQUIRED", "REPEATED_CALL_BLOCKED", "REVISION_MISMATCH", "REVISION_REQUIRED", "RUNTIME_DIR_UNWRITABLE", "SANDBOX_UNAVAILABLE", "SYMLINK_ESCAPE", "TTY_UNSUPPORTED", "UNSUPPORTED_ENCODING"]
 ```
 
 Error categories are `validation`, `security`, `permission`, `runtime`,
@@ -309,21 +309,26 @@ Error categories are `validation`, `security`, `permission`, `runtime`,
 ### Repeat-failure circuit breaker
 
 A call is fingerprinted by its tool name and its normalized arguments
-(`idempotency_key` excluded, since varying only that changes nothing the
-failure depended on). When the same fingerprint produces the same countable
-error code twice, the third attempt is refused with `REPEATED_CALL_BLOCKED`
-before the handler runs. The second failure already warns: its `details` carry
-`consecutive_identical_failures` and a `breaker` note. A success with the same
-arguments, or any change to the arguments, clears the count, and so does any
-successful `apply_patch` or `apply_changes`: a write changes the tree every
-verdict was reached against.
+(`idempotency_key` excluded, since varying only that normally changes nothing
+the failure depended on). When the same fingerprint produces the same
+countable error code twice, the third attempt is refused with
+`REPEATED_CALL_BLOCKED` before the handler runs. The second failure already
+warns: its `details` carry `consecutive_identical_failures` and a `breaker`
+note. A success with the same arguments, or any change to the arguments, gives
+the revised call a fresh budget. Any successful `apply_patch` or
+`apply_changes` clears all verdicts because the tree changed. A terminal
+`exec_command` result does the same in unrestricted workspace-mutation mode,
+because commands may have written to the tree; structured-only mode does not.
 
-Countable means the repeat cannot work. Every non-retryable failure counts.
-So do `PATCH_CONTEXT_NOT_FOUND`, `PATCH_CONTEXT_AMBIGUOUS`, and
-`REVISION_MISMATCH`, which are retryable in the sense that a *different* call
-can succeed — the fix is more context, a narrower scope, or a fresh
-`revision`, and the fingerprint proves the retry carried none of them.
-Failures that depend on time rather than on the arguments — `PATCH_CONFLICT`,
+Countable means the repeat cannot work. Non-retryable failures count except
+`IDEMPOTENCY_KEY_REUSED`: that error specifically tells the caller to choose a
+new key, and keys are excluded from the work fingerprint, so counting it would
+block its own recovery. `PATCH_CONTEXT_NOT_FOUND`,
+`PATCH_CONTEXT_AMBIGUOUS`, `REVISION_MISMATCH`, and `REVISION_REQUIRED` also
+count. They are retryable in the sense that a *different* call can succeed —
+the fix is more context, a narrower scope, or a supplied/fresh `revision`, and
+the fingerprint proves a byte-identical retry carried none of them. Failures
+that depend on time rather than on the arguments — `PATCH_CONFLICT`,
 `COMMAND_LIMIT_REACHED` — never count toward it.
 
 Malformed JSON-RPC uses standard protocol errors: parse `-32700`, invalid
@@ -353,6 +358,10 @@ output is truncated or a caller explicitly requested compact retained output.
 Its offsets are absolute and independent for stdout and stderr. A single
 truncated stream is selected by `next_action`; when both streams are truncated,
 `next_actions` contains one executable `read_output` call for each stream.
+Command results carry `operation_outcome`: `exited_0`, `exited_nonzero`,
+`timeout`, `signal`, `running`, or `spawn_error`. A `Popen` failure returns
+`COMMAND_SPAWN_FAILED` with the last outcome instead of advertising a state the
+runtime can never produce.
 
 A command belongs to the workspace, not to the client or the request that
 started it. Any authenticated client of the same workspace can continue, read,
@@ -411,7 +420,10 @@ client asked. Those counters travel with telemetry.
 `unrestricted` or `structured-only`, `write_paths` lists the directories that
 stay writable for commands under `structured-only`, `structured_write_tools`
 names the tools that write regardless, and `enforced` is `false` whenever
-`structured-only` is configured without the Landlock support that enforces it.
+`structured-only` lacks enabled Landlock ABI 3 or newer. ABIs 1–2 cannot deny
+truncate and therefore cannot provide the promised read-only workspace.
+Configured in-workspace write directories are created before being reported so
+Landlock never silently skips a nonexistent allowlist root.
 `output_retention` reports the per-stream buffer budget alongside
 `completed_command_ttl_seconds` and `max_retained_completed_commands`, which
 together decide when a finished `command_id` stops answering.

@@ -31,6 +31,7 @@ The documentation keeps stable file paths for existing links, while this index p
 ## Engineering and evaluation
 
 - [v0.5.0 execution plan](plan-v0.5.md)
+- [Real-task agent evaluation](agent-evaluation.md)
 - [CI and tests](ci-and-tests.md)
 - [Boundary findings](boundary-findings.md)
 - [Competitive analysis](competitive-analysis.md)

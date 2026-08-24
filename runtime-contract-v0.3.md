@@ -417,6 +417,16 @@ Reads UTF-8 ranges as a stream, reports full file line/byte metadata, rejects
 binary content, and returns continuation metadata when bounded. The
 continuation repeats the workspace-relative path it was given.
 
+Every response carries `revision` and `revision_algorithm` (`"sha256"`).
+`revision` is the SHA-256 of the whole file's UTF-8 bytes, computed inside the
+same streaming pass that produced `content`, so it names the bytes this call
+decoded rather than a second, later read. It covers the entire file even when
+the response is a line range or is truncated: it identifies the file version,
+not the excerpt. It is also the value `apply_changes` requires, and it equals
+the `revision` `apply_patch` reports for the same bytes. The model-facing text
+opens with a `[<path> lines a-b of n revision=<hash>]` banner so a client that
+forwards only text can still supply it.
+
 ### list_dir
 
 Inputs: `"path"`, `"recursive"`, `"max_depth"`, `"max_entries"`, `"include_hidden"`, `"include_ignored"`, `"sort"`.

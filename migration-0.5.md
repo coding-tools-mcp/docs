@@ -103,9 +103,14 @@ See the contract for the full semantics, including the line-content rules
   replay of the same key with the same arguments returns the recorded result
   instead of doing the work twice; reusing the key for different arguments is
   `IDEMPOTENCY_KEY_REUSED`, and a `dry_run` result is never recorded.
+  Concurrent duplicates under the same tool and key wait for the first call
+  and replay its successful result.
 - Several `*** Update File` blocks naming one path in one envelope chain in
   order. This already worked; it is now promised and tested. Their result has
-  one final per-path evidence record with accumulated changed ranges.
+  one final per-path evidence record whose changed ranges describe the net
+  difference from the original baseline to the final staged bytes, not an
+  accumulation of intermediate block-local ranges. If that net result is the
+  original bytes, the baseline is verified without rewriting the file.
 
 ### `git_diff` includes untracked files
 
@@ -139,12 +144,16 @@ installed for `exec_command`.
 - **Repeat-failure circuit breaker.** The third byte-identical call that would
   produce the same deterministic error is refused with `REPEATED_CALL_BLOCKED`
   instead of failing the same way again. Changing an argument gives that call a
-  fresh budget. A successful `apply_patch` or `apply_changes` clears the breaker
-  entirely. The first terminal observation of each command from `exec_command`,
-  `write_stdin`, `read_output`, or `kill_command` also clears it whenever the
-  command could write: in unrestricted mode, through a structured-only write
-  path, or whenever structured-only is advertised but not actually enforced.
-  Re-polling the same completed command does not clear it again.
+  fresh budget. A successful non-dry-run `apply_patch` or `apply_changes` clears
+  the breaker only when it wrote, moved, copied, or deleted something;
+  `already_applied` results do not clear it. The first terminal observation of
+  each command from `exec_command`, `write_stdin`, `read_output`, or
+  `kill_command` also clears it whenever that command could write: in
+  unrestricted mode, through a structured-only write path, when
+  structured-only is not actually enforced, or when Landlock setup failed open
+  for that launch. Re-polling the same completed command does not clear it
+  again. A failure that began before one of these resets is not counted as a
+  strike in the new post-reset generation.
   `IDEMPOTENCY_KEY_REUSED` does not count because its recovery is a new key.
 - **Telemetry counts operations truthfully.** A command that exits nonzero,
   times out, or dies on a signal is no longer recorded as a successful tool

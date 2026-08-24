@@ -167,9 +167,11 @@ a trailing empty element in the patcher's line model.
 `idempotency_key` goes further: the runtime keeps one 64-entry
 least-recently-used cache across both write tools, keyed by `(tool, key)`, and
 replays the recorded result, flagged `idempotent_replay`, rather than doing the
-work twice. An evicted key does the work again. A key names one request. It is
-recorded with a fingerprint of the arguments that produced it, and reusing it
-for anything else — a different patch, a different `dry_run` — is
+work twice. Concurrent calls under the same `(tool, key)` are serialized, so
+duplicates already in flight wait for and replay the first successful result.
+An evicted key does the work again. A key names one request. It is recorded
+with a fingerprint of the arguments that produced it, and reusing it for
+anything else — a different patch, a different `dry_run` — is
 `IDEMPOTENCY_KEY_REUSED` rather than a replay of work that was never done for
 those arguments. Failures are never recorded, and neither is a dry run: it
 changed nothing, so it must never answer a later real apply.
@@ -262,8 +264,9 @@ than labeling pipes as a TTY.
 - `dangerous`: disables command permission gates and Landlock; use only inside
   an isolated container or VM.
 
-These modes do not change the tool list. Direct path tools retain workspace
-confinement in every mode.
+These modes change only one catalog entry: `request_permissions` is advertised
+in `dangerous` mode and hidden (but still callable by name) in `safe` and
+`trusted`. Direct path tools retain workspace confinement in every mode.
 
 `--dangerously-fake-readonly-annotations` advertises every tool as read-only in
 `tools/list` for clients that gate on annotations. It does not change the tool list

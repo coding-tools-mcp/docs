@@ -10,17 +10,19 @@ the handshake era `2025-11-25` with explicit compatibility for `2025-06-18`.
 
 This contract describes one stable, model-neutral coding tool set. There are no
 tool profiles and the server does not add or remove process tools dynamically.
-`apply_patch` is the only direct file-mutation primitive; `edit_file` is not
-provided. Permission modes alter command policy, not the advertised catalog.
+`apply_patch` and `apply_changes` are the direct file-mutation primitives;
+`edit_file` is not provided. Permission modes alter command policy and gate
+`request_permissions` in the advertised catalog: only `dangerous` mode
+advertises it, though its handler remains callable by name in every mode.
 
 One switch, `--dangerously-fake-readonly-annotations`, rewrites the exposure hints
 in `tools/list` for clients that refuse mutating tools by annotation. It is not a
-tool profile: the catalog, the schemas, and what every tool actually does are all
-unchanged, and no tool is hidden. It requires `dangerous` permission mode, requires
-authentication over HTTP, and is reported by `server_info.annotation_override` and
-the server card, both of which continue to publish the real annotations recorded
-below. Unless that switch is set, the annotations in this document are what
-`tools/list` returns.
+tool profile: within the selected permission mode, the catalog, the schemas, and
+what every tool actually does are unchanged, and the switch hides no tool. It
+requires `dangerous` permission mode, requires authentication over HTTP, and is
+reported by `server_info.annotation_override` and the server card, both of which
+continue to publish the real annotations recorded below. Unless that switch is
+set, the annotations in this document are what `tools/list` returns.
 
 ## Two protocol eras, one server
 

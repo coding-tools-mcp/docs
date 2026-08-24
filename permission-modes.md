@@ -43,6 +43,37 @@ Compatibility aliases:
 - `--allow-network`: opens only the network-looking command gate.
 - `--dangerously-skip-all-permissions`: alias for `--permission-mode dangerous`.
 
+## Workspace Mutation Policy
+
+Permission modes govern what `exec_command` may *do*. `--workspace-mutation`
+governs who may write to the workspace at all, and it is orthogonal to them.
+
+```bash
+coding-tools-mcp --workspace-mutation structured-only \
+  --write-path build --write-path .pytest_cache --workspace /path/to/repo
+```
+
+| Mode | Meaning |
+| --- | --- |
+| `unrestricted` (default) | `exec_command` may write anywhere inside the workspace. |
+| `structured-only` | The workspace is read-only for commands; `apply_patch` and `apply_changes` are the only way to change files. |
+
+`structured-only` is enforced by Linux Landlock, the same mechanism that
+confines `exec_command` to the workspace. It is **experimental and off by
+default** because it breaks every command that writes into the tree —
+`pytest`'s caches, `__pycache__`, `npm`, `cargo`, `gradle`, and `git` itself —
+unless each of those directories is listed with `--write-path`. `--write-path`
+is repeatable, is workspace-relative, only applies in `structured-only`, and
+silently drops any entry that escapes the workspace root.
+`CODING_TOOLS_MCP_WORKSPACE_MUTATION` and an `os.pathsep`-separated
+`CODING_TOOLS_MCP_WRITE_PATHS` are equivalent.
+
+Where Landlock is unavailable — a non-Linux host, an old kernel, or
+`--permission-mode dangerous` — the mode cannot be enforced. It is then
+reported with `"enforced": false` in `server_info.workspace_mutation_policy`
+and in `check_exec_environment`, and the server prints a startup warning,
+rather than claiming a restriction that is not in force.
+
 ## Client-Side Annotation Gates
 
 Permission modes govern this server's own gates. They cannot affect a client that

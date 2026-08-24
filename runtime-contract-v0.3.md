@@ -399,13 +399,26 @@ per-session value and no runtime counter: there is no session, and how often a
 budget was hit is a property of the process rather than an answer to whichever
 client asked. Those counters travel with telemetry.
 
+`workspace_mutation_policy` reports who may write to the workspace: `mode` is
+`unrestricted` or `structured-only`, `write_paths` lists the directories that
+stay writable for commands under `structured-only`, `structured_write_tools`
+names the tools that write regardless, and `enforced` is `false` whenever
+`structured-only` is configured without the Landlock support that enforces it.
+`output_retention` reports the per-stream buffer budget alongside
+`completed_command_ttl_seconds` and `max_retained_completed_commands`, which
+together decide when a finished `command_id` stops answering.
+
 ### check_exec_environment
 
 Inputs: none.
 
 Annotations: `{"title":"Check exec environment","readOnlyHint":true,"destructiveHint":false,"idempotentHint":true,"openWorldHint":false}`.
 
-Returns lightweight policy and Landlock status without running active probes.
+Returns lightweight policy and Landlock status without running active probes,
+including the same `workspace_mutation_policy` object `server_info` reports.
+Warnings cover an unavailable Landlock, a non-Linux host (where nothing
+confines a command's filesystem access), a `structured-only` policy that cannot
+be enforced, `permission_mode=dangerous`, and faked read-only annotations.
 
 ### read_file
 

@@ -300,7 +300,7 @@ Retry: This command_id has expired or never existed; …
 Known tool error codes include:
 
 ```json
-["ABSOLUTE_PATH_DENIED", "BINARY_FILE", "COMMAND_CLOSED", "COMMAND_LIMIT_REACHED", "COMMAND_NOT_FOUND", "ELICITATION_UNSUPPORTED", "GIT_ERROR", "INTERNAL_ERROR", "INVALID_ARGUMENT", "IS_DIRECTORY", "NOT_A_DIRECTORY", "NOT_FOUND", "OUTPUT_TOO_LARGE", "PATCH_CONFLICT", "PATCH_CONTEXT_AMBIGUOUS", "PATCH_CONTEXT_NOT_FOUND", "PATCH_FAILED", "PATCH_HUNKS_OVERLAP", "PATCH_ROLLBACK_FAILED", "PATH_OUTSIDE_WORKSPACE", "PERMISSION_REQUIRED", "REPEATED_CALL_BLOCKED", "REVISION_MISMATCH", "REVISION_REQUIRED", "RUNTIME_DIR_UNWRITABLE", "SANDBOX_UNAVAILABLE", "SYMLINK_ESCAPE", "TTY_UNSUPPORTED", "UNSUPPORTED_ENCODING"]
+["ABSOLUTE_PATH_DENIED", "BINARY_FILE", "COMMAND_CLOSED", "COMMAND_LIMIT_REACHED", "COMMAND_NOT_FOUND", "ELICITATION_UNSUPPORTED", "GIT_ERROR", "IDEMPOTENCY_KEY_REUSED", "INTERNAL_ERROR", "INVALID_ARGUMENT", "IS_DIRECTORY", "NOT_A_DIRECTORY", "NOT_FOUND", "OUTPUT_TOO_LARGE", "PATCH_CONFLICT", "PATCH_CONTEXT_AMBIGUOUS", "PATCH_CONTEXT_NOT_FOUND", "PATCH_FAILED", "PATCH_HUNKS_OVERLAP", "PATCH_ROLLBACK_FAILED", "PATH_OUTSIDE_WORKSPACE", "PERMISSION_REQUIRED", "REPEATED_CALL_BLOCKED", "REVISION_MISMATCH", "REVISION_REQUIRED", "RUNTIME_DIR_UNWRITABLE", "SANDBOX_UNAVAILABLE", "SYMLINK_ESCAPE", "TTY_UNSUPPORTED", "UNSUPPORTED_ENCODING"]
 ```
 
 Error categories are `validation`, `security`, `permission`, `runtime`,
@@ -310,12 +310,20 @@ Error categories are `validation`, `security`, `permission`, `runtime`,
 
 A call is fingerprinted by its tool name and its normalized arguments
 (`idempotency_key` excluded, since varying only that changes nothing the
-failure depended on). When the same fingerprint produces the same
-non-retryable error code twice, the third attempt is refused with
-`REPEATED_CALL_BLOCKED` before the handler runs. The second failure already
-warns: its `details` carry `consecutive_identical_failures` and a `breaker`
-note. A success with the same arguments, or any change to the arguments,
-clears the count. Retryable failures — `PATCH_CONFLICT`,
+failure depended on). When the same fingerprint produces the same countable
+error code twice, the third attempt is refused with `REPEATED_CALL_BLOCKED`
+before the handler runs. The second failure already warns: its `details` carry
+`consecutive_identical_failures` and a `breaker` note. A success with the same
+arguments, or any change to the arguments, clears the count, and so does any
+successful `apply_patch` or `apply_changes`: a write changes the tree every
+verdict was reached against.
+
+Countable means the repeat cannot work. Every non-retryable failure counts.
+So do `PATCH_CONTEXT_NOT_FOUND`, `PATCH_CONTEXT_AMBIGUOUS`, and
+`REVISION_MISMATCH`, which are retryable in the sense that a *different* call
+can succeed — the fix is more context, a narrower scope, or a fresh
+`revision`, and the fingerprint proves the retry carried none of them.
+Failures that depend on time rather than on the arguments — `PATCH_CONFLICT`,
 `COMMAND_LIMIT_REACHED` — never count toward it.
 
 Malformed JSON-RPC uses standard protocol errors: parse `-32700`, invalid
@@ -437,7 +445,7 @@ decoded rather than a second, later read. It covers the entire file even when
 the response is a line range or is truncated: it identifies the file version,
 not the excerpt. It is also the value `apply_changes` requires, and it equals
 the `revision` `apply_patch` reports for the same bytes. The model-facing text
-opens with a `[<path> lines a-b of n revision=<hash>]` banner so a client that
+opens with a `[Showing lines a-b of n revision=<hash>]` banner so a client that
 forwards only text can still supply it.
 
 ### list_dir
@@ -537,8 +545,9 @@ with empty content a deletion; a trailing newline adds a blank line, so
 intra-line spans.
 
 A path may appear once per call, as `path` or as `destination`; a duplicate is
-`INVALID_ARGUMENT`. Chaining several edits onto one file is `apply_patch`'s
-imperative territory. An empty `changes` array fails exactly as an empty patch
+`INVALID_ARGUMENT`. Paths are compared after they resolve, so `a.txt` and
+`./a.txt` are one path and naming both is the same error. Chaining several
+edits onto one file is `apply_patch`'s imperative territory. An empty `changes` array fails exactly as an empty patch
 does, with `PATCH_FAILED` and "No files were modified."
 
 The binding size limit is the 1 MiB HTTP request cap, not a change count. At

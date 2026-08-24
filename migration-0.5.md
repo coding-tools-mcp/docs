@@ -91,10 +91,14 @@ line) and the `insert_after` / `insert_before` boundaries.
 - Failure returns the hunk index, nearby numbered text, and candidate match
   positions, so the next attempt can be aimed rather than guessed.
 - A patch whose changes are already present reports `already_applied` instead
-  of failing.
+  of failing, provided the hunk's result is locatable: an exact or
+  trailing-whitespace match of a block that carries a context line, or a
+  multi-line addition. A context-free single line found somewhere in the file
+  is a coincidence and still fails.
 - `apply_patch` and `apply_changes` accept an optional `idempotency_key`. A
-  replay of the same key returns the recorded result instead of doing the work
-  twice.
+  replay of the same key with the same arguments returns the recorded result
+  instead of doing the work twice; reusing the key for different arguments is
+  `IDEMPOTENCY_KEY_REUSED`, and a `dry_run` result is never recorded.
 - Several `*** Update File` blocks naming one path in one envelope chain in
   order. This already worked; it is now promised and tested.
 
@@ -130,9 +134,11 @@ including whether it is actually enforced, is reported in `server_info` as
   workspace state that made the call impossible has changed.
 - **Telemetry counts operations truthfully.** A command that exits nonzero,
   times out, or dies on a signal is no longer recorded as a successful tool
-  call. Consecutive failures are tracked per (tool, error code) rather than in
-  one global slot any tool's success could reset. Anyone comparing a 0.5.0
-  dashboard to an earlier one is comparing different definitions.
+  call, and its terminal outcome is counted once however many times the command
+  is polled afterwards. Consecutive failures are tracked per (tool, error code)
+  rather than in one global slot any tool's success could reset. Anyone
+  comparing a 0.5.0 dashboard to an earlier one is comparing different
+  definitions.
 - **Per-tool output schemas.** `tools/list` now carries a specific
   `outputSchema` per tool instead of one generic envelope.
 - **`check_exec_environment` warns on non-Linux.** Landlock is Linux-only, so

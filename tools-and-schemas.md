@@ -145,9 +145,24 @@ A hunk whose result is already in the file is skipped rather than failing, so
 replaying an envelope after a lost response returns success with
 `already_applied: true` and an `unchanged` operation. An update that changes
 nothing is committed as a baseline assertion, so it does not touch the file's
-mtime. `idempotency_key` goes further: the runtime keeps the last 64 successful
+mtime.
+
+That claim turns a miss into a success, so it takes locatable evidence: the
+hunk's `new` block has to be found at the `exact` or `trailing_ws` grade, and
+the hunk must carry either a context line — which sits inside `new` and so
+anchors the block where the hunk belonged — or a multi-line addition. A hunk
+with no context whose single added line is some common line (`pass`,
+`return None`) is not evidence of anything, and fails with
+`PATCH_CONTEXT_NOT_FOUND` and its repair data instead.
+
+`idempotency_key` goes further: the runtime keeps the last 64 successful
 results per key and replays the recorded one, flagged `idempotent_replay`,
-rather than doing the work twice. Failures are never recorded.
+rather than doing the work twice. A key names one request. It is recorded with
+a fingerprint of the arguments that produced it, and reusing it for anything
+else — a different patch, a different `dry_run` — is `IDEMPOTENCY_KEY_REUSED`
+rather than a replay of work that was never done for those arguments. Failures
+are never recorded, and neither is a dry run: it changed nothing, so it must
+never answer a later real apply.
 
 ### Success and failure fields
 

@@ -2,10 +2,11 @@
 
 0.5.0 is a reliability release. Nothing about the transport or the handshake
 changes, and no tool is renamed or removed from the runtime — but the default
-tool catalog is one tool shorter, one tool is new, and two tools return more
-than they used to. The contract itself is
-[runtime-contract-v0.3.md](runtime-contract-v0.3.md); this page lists only what
-a client or an operator has to notice.
+advertised catalog still contains 18 tools. The registry gains
+`apply_changes`, `request_permissions` becomes mode-gated rather than being
+removed, and three existing tools return more than they used to. The contract
+itself is [runtime-contract-v0.3.md](runtime-contract-v0.3.md); this page lists
+only what a client or an operator has to notice.
 
 The engineering rationale behind each item is in the
 [v0.5.0 execution plan](plan-v0.5.md).

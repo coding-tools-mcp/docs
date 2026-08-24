@@ -26,6 +26,7 @@ The documentation keeps stable file paths for existing links, while this index p
 - [Exec command recipes](exec-command-recipes.md)
 - [Exec troubleshooting](troubleshooting-exec.md)
 - [Migration to 0.3](migration-0.3.md)
+- [Migration to 0.5](migration-0.5.md)
 - [Profile](profile.md)
 
 ## Engineering and evaluation

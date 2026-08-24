@@ -316,9 +316,12 @@ countable error code twice, the third attempt is refused with
 warns: its `details` carry `consecutive_identical_failures` and a `breaker`
 note. A success with the same arguments, or any change to the arguments, gives
 the revised call a fresh budget. Any successful `apply_patch` or
-`apply_changes` clears all verdicts because the tree changed. A terminal
-`exec_command` result does the same in unrestricted workspace-mutation mode,
-because commands may have written to the tree; structured-only mode does not.
+`apply_changes` clears all verdicts because the tree changed. The first terminal
+observation of each command from `exec_command`, `write_stdin`, `read_output`,
+or `kill_command` does the same whenever that command could have written to the
+tree: in unrestricted mode, under an unenforced structured-only policy, or
+through a configured structured-only write path. Later observations of the
+same completed command do not reset the breaker again.
 
 Countable means the repeat cannot work. Non-retryable failures count except
 `IDEMPOTENCY_KEY_REUSED`: that error specifically tells the caller to choose a
@@ -422,8 +425,10 @@ stay writable for commands under `structured-only`, `structured_write_tools`
 names the tools that write regardless, and `enforced` is `false` whenever
 `structured-only` lacks enabled Landlock ABI 3 or newer. ABIs 1–2 cannot deny
 truncate and therefore cannot provide the promised read-only workspace.
-Configured in-workspace write directories are created before being reported so
-Landlock never silently skips a nonexistent allowlist root.
+Reporting validates configured in-workspace write directories without creating
+them. Missing directories are created only immediately before an
+`exec_command` installs its Landlock ruleset, so Landlock never silently skips
+a nonexistent allowlist root.
 `output_retention` reports the per-stream buffer budget alongside
 `completed_command_ttl_seconds` and `max_retained_completed_commands`, which
 together decide when a finished `command_id` stops answering.

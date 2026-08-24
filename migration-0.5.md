@@ -130,8 +130,9 @@ including whether it is actually enforced, is reported in `server_info` as
 `workspace_mutation_policy`. See
 [permission-modes.md](permission-modes.md).
 Full enforcement requires Landlock ABI 3 or newer because ABIs 1–2 cannot deny
-truncate. Missing in-workspace `--write-path` directories are created before
-the policy is reported or installed.
+truncate. Reporting the policy does not create missing in-workspace
+`--write-path` directories; they are created immediately before Landlock is
+installed for `exec_command`.
 
 ## Behavior changes that need no action
 
@@ -139,8 +140,11 @@ the policy is reported or installed.
   produce the same deterministic error is refused with `REPEATED_CALL_BLOCKED`
   instead of failing the same way again. Changing an argument gives that call a
   fresh budget. A successful `apply_patch` or `apply_changes` clears the breaker
-  entirely, as does a terminal `exec_command` in unrestricted workspace mode,
-  since the workspace state that made the call impossible may have changed.
+  entirely. The first terminal observation of each command from `exec_command`,
+  `write_stdin`, `read_output`, or `kill_command` also clears it whenever the
+  command could write: in unrestricted mode, through a structured-only write
+  path, or whenever structured-only is advertised but not actually enforced.
+  Re-polling the same completed command does not clear it again.
   `IDEMPOTENCY_KEY_REUSED` does not count because its recovery is a new key.
 - **Telemetry counts operations truthfully.** A command that exits nonzero,
   times out, or dies on a signal is no longer recorded as a successful tool

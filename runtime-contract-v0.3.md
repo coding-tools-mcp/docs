@@ -513,10 +513,15 @@ Supports `*** Add File`, `*** Update File`, `*** Delete File`, and
 
 Hunk location, grading, idempotency, and the success/failure fields are
 specified once in [tools-and-schemas.md](tools-and-schemas.md#apply_patch).
+An explicit named `@@ <scope>` is a hard placement boundary: if the scope is
+missing or the hunk only matches outside it, placement fails instead of
+falling back to a whole-file candidate.
 Each operation's resolved primary path may appear only once per envelope.
 `Add File` may overwrite an existing file and `Move to` may overwrite an
 existing destination. Move destinations are not primary paths, so distinct
-sources may move to one destination in order and the later write wins.
+sources may move to one destination in order and the later write wins. A move
+that changes paths reports both the destination's final evidence and a source
+`delete` record in `affected_files`.
 `apply_patch` carries no `revision` argument — its context lines are its
 optimistic check.
 

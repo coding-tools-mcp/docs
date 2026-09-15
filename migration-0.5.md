@@ -87,7 +87,10 @@ See the contract for the full semantics, including the line-content rules
 ### `apply_patch` recovery
 
 - `@@ <scope>` headers and `*** End of File` now participate in locating a
-  hunk instead of being ignored.
+  hunk instead of being ignored. A named scope is binding: if it is missing or
+  the hunk only matches outside it, the operation fails with
+  `PATCH_CONTEXT_NOT_FOUND` rather than silently falling back to the whole
+  file.
 - Matching is graded: exact, then ignoring trailing whitespace, then ignoring
   indentation width. The grade actually used is reported in `match_quality`,
   so a downgrade is visible rather than silent.
@@ -113,7 +116,9 @@ See the contract for the full semantics, including the line-content rules
   existing file; `Move to` may replace an existing destination; and distinct
   source files may move to one destination in order, with the later write
   winning. Move destinations do not participate in the primary-path duplicate
-  check.
+  check. Moves that change paths also report an explicit source `delete` in
+  `affected_files`, so machine-readable evidence describes the final workspace
+  rather than only the destination bytes.
 
 ### `git_diff` includes untracked files
 

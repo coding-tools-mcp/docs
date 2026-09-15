@@ -107,9 +107,11 @@ be unique within the file. Two things narrow the search when it is not:
 
 - `@@ <scope>` — the text after `@@` names the enclosing block (`@@ def
   farewell`). Candidates are grouped by the scope anchor that most closely
-  precedes them; if one group remains, it wins. A unified-diff position header
-  (`@@ -1,4 +1,4 @@`) names line numbers this dialect does not use and reads as
-  no scope.
+  precedes them; if one group remains, it wins. A named scope is binding: if
+  that scope does not exist, or the hunk only matches outside it, the patch
+  fails with `PATCH_CONTEXT_NOT_FOUND` rather than falling back to a whole-file
+  match. A unified-diff position header (`@@ -1,4 +1,4 @@`) names line numbers
+  this dialect does not use and reads as no scope.
 - `*** End of File` — placed on its own line inside a hunk, it prefers the
   placement that reaches the end of the file.
 
@@ -144,6 +146,11 @@ before any write. A `*** Move to:` destination is not a primary path: distinct
 source files may move to the same destination in order, and the later write
 wins. `*** Add File` may replace an existing file, and `*** Move to:` may
 replace an existing destination.
+
+When a move changes paths, `affected_files` reports the destination's final
+state and an explicit `delete` record for the source path. This keeps the
+machine-readable evidence faithful even when a later operation makes the
+destination's final bytes equal to its original baseline.
 
 A hunk whose result is already in the file is skipped rather than failing, so
 replaying an envelope after a lost response returns success with

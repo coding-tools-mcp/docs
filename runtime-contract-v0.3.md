@@ -513,9 +513,10 @@ Supports `*** Add File`, `*** Update File`, `*** Delete File`, and
 
 Hunk location, grading, idempotency, and the success/failure fields are
 specified once in [tools-and-schemas.md](tools-and-schemas.md#apply_patch).
-An explicit named `@@ <scope>` is a hard placement boundary: if the scope is
-missing or the hunk only matches outside it, placement fails instead of
-falling back to a whole-file candidate.
+An explicit `@@ <context>` is a forward-only text anchor. It must be found at
+or after the current hunk cursor, and the hunk body is searched only after the
+anchor. It does not create a language-aware function/class/block boundary.
+Pure-addition hunks validate their anchor, if any, and append at EOF.
 Each operation's resolved primary path may appear only once per envelope.
 `Add File` may overwrite an existing file and `Move to` may overwrite an
 existing destination. Move destinations are not primary paths, so distinct

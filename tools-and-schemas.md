@@ -102,18 +102,25 @@ final newline is an ordinary line the hunk can add or remove.
 
 ### Locating a hunk
 
-A hunk has no line numbers; it finds itself by its context, so the context must
-be unique within the file. Two things narrow the search when it is not:
+A hunk has no line numbers; it finds itself by its context. Matching proceeds
+from a forward-only cursor, so later hunks cannot silently jump back to an
+earlier occurrence. Two locators affect placement:
 
-- `@@ <scope>` — the text after `@@` names the enclosing block (`@@ def
-  farewell`). Candidates are grouped by the scope anchor that most closely
-  precedes them; if one group remains, it wins. A named scope is binding: if
-  that scope does not exist, or the hunk only matches outside it, the patch
-  fails with `PATCH_CONTEXT_NOT_FOUND` rather than falling back to a whole-file
-  match. A unified-diff position header (`@@ -1,4 +1,4 @@`) names line numbers
-  this dialect does not use and reads as no scope.
+- `@@ <context>` — the text after `@@` is a language-agnostic text anchor, not
+  a parsed function/class/block scope. It must occur at or after the current
+  cursor; once found, old/context lines are searched only after that anchor.
+  Missing anchors fail with `PATCH_CONTEXT_NOT_FOUND`. This is intentionally
+  syntax-agnostic: Python indentation, braces, and other language constructs
+  do not define a search boundary. A unified-diff position header
+  (`@@ -1,4 +1,4 @@`) names line numbers this dialect does not use and reads as
+  no text anchor.
 - `*** End of File` — placed on its own line inside a hunk, it prefers the
   placement that reaches the end of the file.
+
+A hunk containing only added lines has no old/context block to locate. As in
+Codex, its `@@ <context>` anchor is still validated first, then the new lines
+are appended at EOF. Without an anchor, a pure-addition hunk simply appends at
+EOF.
 
 A blank context line may be written as `""` or as a single space; both mean the
 same empty line.

@@ -15,8 +15,8 @@
   trailing whitespace, then ignoring indentation width — and the grade used is
   reported as `match_quality`; there is no similarity-scored fuzzy matching and
   no line-number fallback. Context that appears twice fails with
-  `PATCH_CONTEXT_AMBIGUOUS` unless a `@@ <scope>` header or `*** End of File`
-  anchor picks one occurrence, and context that appears nowhere fails with
+  `PATCH_CONTEXT_AMBIGUOUS` unless a forward `@@ <context>` text anchor or
+  `*** End of File` picks one occurrence, and context that appears nowhere fails with
   `PATCH_CONTEXT_NOT_FOUND`. Both failures carry the hunk index, numbered
   nearby text, and candidate positions to repair from.
 - The `patch_lock` that serializes `apply_patch` is an in-process mutex. Two

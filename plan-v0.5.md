@@ -65,7 +65,7 @@ prompt-cancellation responsiveness ([issue #48](https://github.com/xyTom/coding-
 | --- | --- | --- |
 | B2 | No repeat-failure circuit breaker; a verbatim retry of a deterministic error is unlimited. | no implementation exists |
 | B3 | `request_permissions` is always advertised (`ToolSpec` marked `read_only=True`, anchor `"request_permissions": ToolSpec(` at `server.py:684`), yet unconditionally returns `ELICITATION_UNSUPPORTED` outside `dangerous` mode (`def request_permissions` at `server.py:3397`, error at `:3419`). | confirmed |
-| C2 | The `@@ <scope>` header text is parsed and discarded (`if lines[i].startswith("@@")` at `patching.py:319`), so a Codex-dialect scope anchor cannot disambiguate. Reproduced live: `@@ def farewell` + a non-unique body line fails `PATCH_CONTEXT_AMBIGUOUS`. | confirmed |
+| C2 | The `@@ <context>` header text is parsed and discarded (`if lines[i].startswith("@@")` at `patching.py:319`), so a Codex-dialect forward text anchor cannot disambiguate. Reproduced live: `@@ def farewell(name):` + a non-unique body line fails `PATCH_CONTEXT_AMBIGUOUS`. | confirmed |
 | C4 | Exact line equality only (`find_subsequence_all` at `patching.py:426`); one trailing space in a context line is `PATCH_CONTEXT_NOT_FOUND`. Reproduced live. | confirmed |
 | C6 | Success returns only `Patch applied to N file(s) (+a -r)` plus a status summary (`_render_patch` at `tool_results.py:172`); no post-edit evidence. | confirmed |
 | C7 | No already-applied detection, no idempotency key for mutating calls. | no implementation exists |
@@ -97,8 +97,8 @@ file text and candidate positions).
 1. **The appendix repro script's expected output is wrong.** Run as written at
    `b079994` it passes **4/5**, not 3/5: its case 3 places `def greet(name):`
    as an ordinary context line (which is unique in the fixture), so it never
-   exercises the discarded `@@` scope. C2 itself is real — moving the scope
-   text onto the `@@` line (`@@ def farewell`) reproduces
+   exercises the discarded `@@` anchor. C2 itself is real — moving the exact
+   anchor text onto the `@@` line (`@@ def farewell(name):`) reproduces
    `PATCH_CONTEXT_AMBIGUOUS`. When the script is restored under `scripts/`,
    case 3 must be corrected to put the anchor on the `@@` line; only then is
    "all five OK" a valid Track A exit criterion.
@@ -154,17 +154,18 @@ measurement. Track B builds on Track A's C6 output (shared revision mechanism).
 ### Track A — finish the `apply_patch` recovery protocol (do first)
 
 **A-0. Restore the regression guard.** Add `scripts/repro_patch_failures.py`
-from the handoff appendix with case 3 corrected per §2.3(1) (scope text on the
+from the handoff appendix with case 3 corrected per §2.3(1) (anchor text on the
 `@@` line). Exit status = number of failing cases; wire into CI. Extend with a
 same-path-chaining envelope (locks in current behavior per decision D-2) and an
 `*** End of File` case.
 
-**A-1. C2 — make `@@ <scope>` participate in hunk location.** In `parse_patch`,
+**A-1. C2 — make `@@ <context>` participate in hunk location.** In `parse_patch`,
 retain the header text after `@@` per hunk instead of dropping it
-(`patching.py:319-325`). In `apply_update_hunks`, when context matches multiple
-locations, use the scope line to select the candidate whose preceding lines
-contain (exact, then whitespace-insensitive) the scope text; a unified-diff
-numeric header (`@@ -1,4 +1,4 @@`) is treated as no scope, preserving today's
+(`patching.py:319-325`). Treat it as a forward text anchor, not a parsed
+language scope. In `apply_update_hunks`, search for the anchor at or after the
+current cursor using the same exact/trailing-whitespace/trim grades as normal
+context, then continue the hunk search only after that anchor. A unified-diff
+numeric header (`@@ -1,4 +1,4 @@`) is treated as no text anchor, preserving the
 accepted shape. Give `*** End of File` real semantics at the same time: prefer
 the match that ends at EOF when present. Exit criteria: corrected repro case 3
 passes; `PATCH_CONTEXT_AMBIGUOUS` count in the repro fixtures drops to zero;
@@ -195,7 +196,7 @@ candidate match positions for the ambiguous case. `hunk_index` and
 
 **A-5. C1 — description and disclosure.** Extend the `apply_patch` tool
 description (`server.py:609-612`) with: context must be unique within the file
-(or use `@@ <scope>`), `@@` carries scope semantics, a blank context line may
+(or use `@@ <context>`), `@@` advances a forward text-search cursor, a blank context line may
 be `""` or a single space, and matching is graded with truthful labels. Keep it
 under the length that clients truncate; the full format reference lives in
 [tools-and-schemas.md](tools-and-schemas.md).

@@ -86,11 +86,16 @@ See the contract for the full semantics, including the line-content rules
 
 ### `apply_patch` recovery
 
-- `@@ <scope>` headers and `*** End of File` now participate in locating a
-  hunk instead of being ignored. A named scope is binding: if it is missing or
-  the hunk only matches outside it, the operation fails with
-  `PATCH_CONTEXT_NOT_FOUND` rather than silently falling back to the whole
-  file.
+- `@@ <context>` is a forward text anchor, not a language scope. The anchor
+  must be found at or after the current search cursor, and the hunk body is
+  matched only after it. This prevents fallback to an earlier identical block
+  without trying to infer Python indentation, JavaScript braces, or any other
+  language structure. A missing anchor is `PATCH_CONTEXT_NOT_FOUND`.
+- A pure-addition update hunk validates any `@@ <context>` first and then
+  appends at EOF, matching Codex's current placement semantics. Anchorless
+  pure additions also append at EOF.
+- `*** End of File` participates in locating non-empty old/context blocks
+  instead of being ignored.
 - Matching is graded: exact, then ignoring trailing whitespace, then ignoring
   indentation width. The grade actually used is reported in `match_quality`,
   so a downgrade is visible rather than silent.

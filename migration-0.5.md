@@ -77,7 +77,9 @@ silently overwritten.
 `write` remains an upsert: it requires `revision` when its path exists and may
 omit it when creating a missing path. `create` rejects `revision` and asserts
 absence; `edit`, `delete`, `move`, and `copy` require it. A path may appear once
-per call; chaining several edits onto one file is `apply_patch`'s territory.
+per call; put several line edits for one file in that file's single `edit`
+change. Replacement content may use LF, CRLF, or CR separators; they are
+normalized before the file's existing line-ending convention is restored.
 See the contract for the full semantics, including the line-content rules
 (`""` is zero lines; a trailing newline adds a blank line) and the
 `insert_after` / `insert_before` boundaries.
@@ -106,12 +108,12 @@ See the contract for the full semantics, including the line-content rules
   `IDEMPOTENCY_KEY_REUSED`, and a `dry_run` result is never recorded.
   Concurrent duplicates under the same tool and key wait for the first call
   and replay its successful result.
-- Several `*** Update File` blocks naming one path in one envelope chain in
-  order. This already worked; it is now promised and tested. Their result has
-  one final per-path evidence record whose changed ranges describe the net
-  difference from the original baseline to the final staged bytes, not an
-  accumulation of intermediate block-local ranges. If that net result is the
-  original bytes, the baseline is verified without rewriting the file.
+- `apply_patch` now matches Codex path semantics: an operation's resolved
+  primary path may appear only once per envelope; `Add File` may replace an
+  existing file; `Move to` may replace an existing destination; and distinct
+  source files may move to one destination in order, with the later write
+  winning. Move destinations do not participate in the primary-path duplicate
+  check.
 
 ### `git_diff` includes untracked files
 

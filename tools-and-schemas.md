@@ -135,15 +135,15 @@ difference is preserved instead of being rewritten; added lines under the
 `indent` grade are re-indented by the block's uniform delta, and a delta that
 is not uniform disqualifies the grade rather than being approximated.
 
-### Chaining and idempotency
+### Primary paths, overwrites, and idempotency
 
-Several `*** Update File` blocks naming one path in one envelope chain in
-order: each sees the previous block's result. `apply_changes` is the
-declarative counterpart and rejects same-path duplicates instead. Chained
-blocks produce one final `affected_files` record for the resolved path; its
-revision and line count name the committed bytes, and its `changed_ranges`
-describe the net difference from the original baseline to those final bytes,
-not a stale accumulation of intermediate block-local ranges.
+`apply_patch` follows the Codex tool-entry path rules. Each operation's primary
+path may appear only once in an envelope after workspace resolution, so
+`a.txt` and `./a.txt` are the same primary path and a duplicate is rejected
+before any write. A `*** Move to:` destination is not a primary path: distinct
+source files may move to the same destination in order, and the later write
+wins. `*** Add File` may replace an existing file, and `*** Move to:` may
+replace an existing destination.
 
 A hunk whose result is already in the file is skipped rather than failing, so
 replaying an envelope after a lost response returns success with

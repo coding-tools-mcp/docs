@@ -6,6 +6,14 @@
 Line numbers drift; each reference carries anchor text, and the anchor text is
 authoritative. Confirm with `grep -n` before acting.
 
+**2026-09-14 compatibility update:** the implementation decision in D-2 below
+is superseded by the release-candidate compatibility review. `apply_patch` now
+uses the Codex tool-entry contract: duplicate resolved primary paths are
+rejected, while Move destinations are not primary paths and may be shared;
+`Add File` and `Move to` may overwrite existing destinations. The historical
+discussion is retained to explain why the earlier implementation chained
+same-path updates before this compatibility target was fixed.
+
 This plan supersedes the circulating handoff/review material for v0.5.0. Where
 that material disagreed with the code at `b079994`, this document records the
 correction (section 2) and plans against the code, not the memo.

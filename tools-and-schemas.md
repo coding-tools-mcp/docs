@@ -154,6 +154,12 @@ source files may move to the same destination in order, and the later write
 wins. `*** Add File` may replace an existing file, and `*** Move to:` may
 replace an existing destination.
 
+A move destination can be a later operation's primary path, even before it
+exists on disk. Follow-up operations use its staged content and mode; an
+`Add File` overwrite preserves that mode. Every path retains its first
+baseline for the entire envelope, so repeated overwrites do not bypass
+conflict detection for intervening external changes.
+
 When a move changes paths, `affected_files` reports the destination's final
 state and an explicit `delete` record for the source path. This keeps the
 machine-readable evidence faithful even when a later operation makes the
@@ -174,9 +180,10 @@ anchors the block where the hunk belonged — or a multi-line addition. A hunk
 with no context whose single added line is some common line (`pass`,
 `return None`) is not evidence of anything, and fails with
 `PATCH_CONTEXT_NOT_FOUND` and its repair data instead. The evidence must be
-unique inside the hunk's `@@` scope and `*** End of File` constraint. A result
-made only of blank lines is never evidence: every newline-terminated file has
-a trailing empty element in the patcher's line model.
+unique inside the same forward anchor/cursor window and `*** End of File`
+constraint. A result made only of blank lines is never evidence: every
+newline-terminated file has a trailing empty element in the patcher's line
+model.
 
 `idempotency_key` goes further: the runtime keeps one 64-entry
 least-recently-used cache across both write tools, keyed by `(tool, key)`, and

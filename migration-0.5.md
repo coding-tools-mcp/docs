@@ -109,7 +109,7 @@ See the contract for the full semantics, including the line-content rules
   trailing-whitespace match of a block that carries a context line, or a
   multi-line addition. A context-free single line found somewhere in the file
   is a coincidence and still fails. Evidence must also be non-blank, unique,
-  and inside the hunk's `@@` scope and EOF constraints.
+  and inside the same forward anchor/cursor window and EOF constraints.
 - `apply_patch` and `apply_changes` accept an optional `idempotency_key`. A
   replay of the same key with the same arguments returns the recorded result
   instead of doing the work twice; reusing the key for different arguments is

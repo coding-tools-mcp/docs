@@ -1,53 +1,30 @@
-# Documentation map
+# Coding Tools MCP Docs
 
-The documentation keeps stable file paths for existing links, while this index provides the logical structure for humans and coding agents.
+The documentation website for [Coding Tools MCP](https://github.com/xyTom/coding-tools-mcp), built with Next.js and Fumadocs.
 
-## Get started and connect clients
+## Development
 
-- [Quickstart](quickstart.md)
-- [MCP client configuration](mcp-client-config.md)
-- [Remote MCP](remote-mcp.md)
-- [Docker](docker.md)
-- [Troubleshooting](troubleshooting.md)
+Requires Node.js 22+ and npm.
 
-## Runtime and protocol reference
+```bash
+npm install
+npm run dev
+```
 
-- [Tools and schemas](tools-and-schemas.md)
-- [Runtime contract v0.3](runtime-contract-v0.3.md)
-- [Runtime contract v0.2](runtime-contract-v0.2.md)
-- [Permission modes](permission-modes.md)
-- [Telemetry](telemetry.md)
-- [Security boundary](security-boundary.md)
-- [Limitations](limitations.md)
+Run the full local validation with:
 
-## Guides and integration
+```bash
+npm run check
+```
 
-- [Embedding](embedding.md)
-- [Exec command recipes](exec-command-recipes.md)
-- [Exec troubleshooting](troubleshooting-exec.md)
-- [Migration to 0.3](migration-0.3.md)
-- [Migration to 0.5](migration-0.5.md)
-- [Profile](profile.md)
+## Documentation ownership
 
-## Engineering and evaluation
+This repository owns user-facing tutorials, setup guides, migration guides, and troubleshooting content.
 
-- [v0.5.0 execution plan](plan-v0.5.md)
-- [Real-task agent evaluation](agent-evaluation.md)
-- [CI and tests](ci-and-tests.md)
-- [Boundary findings](boundary-findings.md)
-- [Competitive analysis](competitive-analysis.md)
-- [Dogfood](dogfood.md)
-- [SWE-bench](swe-bench.md)
-- [SWE-bench supporting material](swebench/README.md)
+Runtime contracts, tool schemas, security invariants, CI evidence, and benchmark evidence remain authoritative in the core repository. Link to those sources instead of copying them here.
 
-## Component-local documentation
+## Repositories
 
-Some documentation belongs with the component it describes:
-
-- [Desktop client](../apps/desktop-client/README.md)
-- [Tunnel integrations](../integrations/tunnels/README.md)
-- [npm launcher](../packages/npm-launcher/README.md)
-- [Cloudflare sandbox control](../infra/cloudflare/sandbox-control/README.md)
-- [Promo video sources](../media/promo-video/README.md)
-
-Prefer one authoritative home for each fact and link to it instead of duplicating long explanations.
+- Core runtime: https://github.com/xyTom/coding-tools-mcp
+- Desktop app: https://github.com/coding-tools-mcp/desktop
+- Documentation: https://github.com/coding-tools-mcp/docs

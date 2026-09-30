@@ -1,0 +1,253 @@
+---
+title: 嵌入 Coding Tools MCP
+description: 从你自己的应用或 agent 中启动并驱动 Coding Tools MCP。
+---
+
+这一页是“程序自己启动 `coding-tools-mcp`，而不是把它配置到现成 MCP host”时的参考模板。任何 embedder 都必须正确处理三件事：
+
+1. **启动**：通过 stdio 启动 server，或者连接 Docker / HTTP 部署。
+2. **通信**：发送 newline-delimited JSON-RPC（`initialize` → `tools/call`）。
+3. **关闭**：关闭 stdin 并终止 child process，避免你的应用退出后留下后台 `coding-tools-mcp` 进程。
+
+生产级 embedder 可以沿用同一骨架，再补上 request timeout、EPIPE-safe write、reconnect loop，以及 SIGTERM → SIGKILL 的关闭升级策略。
+
+下面两个模板使用握手式协议 `2025-11-25`，这通常是手写客户端最合适的默认值：启动时只需一次握手，之后不需要重复。如果你已经实现 `2026-07-28`，可以完全跳过握手，见 [使用 2026-07-28](#使用-2026-07-28)。
+
+## 最小 Node.js 客户端
+
+```js
+import { spawn } from "node:child_process";
+import { createInterface } from "node:readline";
+
+class CodingToolsClient {
+  #child;
+  #pending = new Map();
+  #nextId = 1;
+
+  /** cmd example: ["uvx", "coding-tools-mcp", "--stdio", "--workspace", repo] */
+  async start(cmd) {
+    const [command, ...args] = cmd;
+    this.#child = spawn(command, args, { stdio: ["pipe", "pipe", "inherit"] });
+
+    this.#child.stdin.on("error", () => this.#failAll(new Error("backend closed")));
+    this.#child.once("exit", () => this.#failAll(new Error("backend exited")));
+
+    createInterface({ input: this.#child.stdout }).on("line", (line) => {
+      const message = JSON.parse(line);
+      const pending = this.#pending.get(message.id);
+      if (!pending) return;
+      this.#pending.delete(message.id);
+      message.error
+        ? pending.reject(new Error(message.error.message))
+        : pending.resolve(message.result);
+    });
+
+    await this.#request("initialize", {
+      protocolVersion: "2025-11-25",
+      capabilities: {},
+      clientInfo: { name: "my-agent", version: "0.1.0" },
+    });
+    this.#notify("notifications/initialized", {});
+  }
+
+  callTool(name, args) {
+    return this.#request("tools/call", { name, arguments: args });
+  }
+
+  async close() {
+    if (!this.#child) return;
+    this.#child.stdin.end();
+    this.#child.kill();
+    this.#failAll(new Error("client closed"));
+  }
+
+  #request(method, params, timeoutMs = 60_000) {
+    const id = this.#nextId++;
+    const promise = new Promise((resolve, reject) => {
+      const timer = setTimeout(() => {
+        this.#pending.delete(id);
+        reject(new Error(`${method} timed out`));
+      }, timeoutMs);
+      timer.unref();
+
+      this.#pending.set(id, {
+        resolve: (v) => (clearTimeout(timer), resolve(v)),
+        reject: (e) => (clearTimeout(timer), reject(e)),
+      });
+    });
+
+    this.#child.stdin.write(
+      JSON.stringify({ jsonrpc: "2.0", id, method, params }) + "\n",
+    );
+    return promise;
+  }
+
+  #notify(method, params) {
+    this.#child.stdin.write(
+      JSON.stringify({ jsonrpc: "2.0", method, params }) + "\n",
+    );
+  }
+
+  #failAll(error) {
+    for (const pending of this.#pending.values()) pending.reject(error);
+    this.#pending.clear();
+  }
+}
+
+const client = new CodingToolsClient();
+
+process.on("exit", () => void client.close());
+process.on("SIGINT", () => process.exit(130));
+process.on("SIGTERM", () => process.exit(143));
+
+await client.start([
+  "uvx",
+  "coding-tools-mcp",
+  "--stdio",
+  "--workspace",
+  process.cwd(),
+]);
+
+console.log(await client.callTool("server_info", {}));
+console.log(
+  await client.callTool("exec_command", {
+    cmd: "node --version",
+    timeout_ms: 10_000,
+  }),
+);
+
+await client.close();
+```
+
+这里有两个容易漏的点：
+
+- stdin 的 `error` handler 和 child `exit` handler 都要有，否则 backend 提前退出时可能出现 uncaught EPIPE。
+- 应用退出前始终调用 `close()`。先让 stdin EOF 给 server 一个干净退出机会，再用 terminate 兜底。
+
+## 最小 Python 客户端
+
+```python
+import json
+import subprocess
+
+
+class CodingToolsClient:
+    def __init__(self, cmd: list[str]) -> None:
+        self.proc = subprocess.Popen(
+            cmd,
+            stdin=subprocess.PIPE,
+            stdout=subprocess.PIPE,
+            text=True,
+        )
+        self.next_id = 1
+
+        self.request("initialize", {
+            "protocolVersion": "2025-11-25",
+            "capabilities": {},
+            "clientInfo": {"name": "my-agent", "version": "0.1.0"},
+        })
+        self.notify("notifications/initialized", {})
+
+    def request(self, method: str, params: dict, timeout: float = 60.0):
+        rpc_id, self.next_id = self.next_id, self.next_id + 1
+        self._write({
+            "jsonrpc": "2.0",
+            "id": rpc_id,
+            "method": method,
+            "params": params,
+        })
+
+        # coding-tools-mcp over stdio answers in request order.
+        line = self.proc.stdout.readline()
+        if not line:
+            raise RuntimeError("backend exited")
+
+        message = json.loads(line)
+        if "error" in message:
+            raise RuntimeError(message["error"]["message"])
+        return message["result"]
+
+    def call_tool(self, name: str, args: dict):
+        return self.request("tools/call", {
+            "name": name,
+            "arguments": args,
+        })
+
+    def notify(self, method: str, params: dict) -> None:
+        self._write({
+            "jsonrpc": "2.0",
+            "method": method,
+            "params": params,
+        })
+
+    def _write(self, message: dict) -> None:
+        self.proc.stdin.write(json.dumps(message) + "\n")
+        self.proc.stdin.flush()
+
+    def close(self) -> None:
+        self.proc.stdin.close()
+        self.proc.terminate()
+        try:
+            self.proc.wait(timeout=5)
+        except subprocess.TimeoutExpired:
+            self.proc.kill()
+        finally:
+            self.proc.stdout.close()
+
+
+client = CodingToolsClient([
+    "uvx",
+    "coding-tools-mcp",
+    "--stdio",
+    "--workspace",
+    ".",
+])
+
+try:
+    print(client.call_tool("server_info", {}))
+finally:
+    client.close()
+```
+
+## 使用 2026-07-28
+
+新协议没有握手。每个请求都通过 `params._meta` 携带自己的版本与 client capabilities，所以客户端第一条消息就可以直接调用 tool；重连后也没有 session state 需要恢复：
+
+```json
+{"jsonrpc":"2.0","id":1,"method":"tools/call","params":{"name":"server_info","arguments":{},"_meta":{"io.modelcontextprotocol/protocolVersion":"2026-07-28","io.modelcontextprotocol/clientCapabilities":{},"io.modelcontextprotocol/clientInfo":{"name":"my-agent","version":"0.1.0"}}}}
+```
+
+`server/discover` 使用相同的 `_meta`，method 改为 `server/discover`，不需要 arguments。它会报告 server 支持的版本、capability 与 workspace instruction，也就是传统 `initialize` 会告诉你的内容。
+
+现代协议结果还会带 `resultType`、server identity `_meta` 和 cache hint。HTTP transport 中，每个请求还必须通过 header 镜像版本与 method；详见 [远程访问](/zh-CN/guides/remote-access)。
+
+如果去掉现代 `_meta`，同一个请求就会按握手时代处理。两代协议按**每个请求**决定，而不是按 connection 决定。
+
+## Backend 变体
+
+客户端主体可以保持不变，只需要替换启动 / 连接步骤：
+
+| Backend | 启动 | 停止 |
+| --- | --- | --- |
+| 本地 stdio | `uvx coding-tools-mcp --stdio --workspace <repo>` | 关闭 stdin，再 terminate |
+| Docker stdio | `docker run --rm -i -v "$PWD:/workspace" <image> --stdio` | 关闭 stdin；server EOF 退出，`--rm` 自动删除容器 |
+| Docker HTTP | `docker run --rm --init -p 8765:8765 <image>`（见 [Docker 沙箱](/zh-CN/guides/docker-sandbox)） | `docker stop`，server 会处理 SIGTERM |
+| Remote HTTP | POST JSON-RPC 到 `http://host:8765/mcp`，带 `Authorization: Bearer <token>` | server 生命周期由启动它的一方管理 |
+
+## 清理 checklist
+
+- 使用结束后关闭 server stdin；stdio server 会在 EOF 时退出。
+- SIGTERM 作为兜底，只有最后才升级到 SIGKILL。
+- 把 cleanup 注册在你自己的所有退出路径上（`process.on("exit")`、`atexit`、signal handler），避免 agent crash 后留下 orphan process。
+- 如果把 server 接到 model loop，给每个请求设置 timeout，避免挂住的 backend 把 agent 一起卡死。
+
+## 环境变量注意事项
+
+`exec_command` 默认只继承核心环境（`PATH`、runtime `HOME`、locale 等）。详见核心仓库的 [permission modes](https://github.com/xyTom/coding-tools-mcp/blob/main/docs/permission-modes.md)。
+
+对 embedder 来说最常见的两个影响：
+
+- 从 login shell 启动你的应用，或显式传 `PATH`，这样 nvm / pyenv 等 version manager 才能解析到用户实际看到的工具链。更稳健的 launcher 可以在 startup 时读取一次 login-shell `PATH`，再用于 spawn backend。
+- 真正需要完整 host environment 时，设置 `CODING_TOOLS_MCP_SHELL_ENV_INHERIT=all`（或 `--shell-env-inherit all`）。Dangerous mode 以外仍会过滤敏感变量。
+
+`HOME` 会被重定向到 runtime 专用目录；完整行为以 [runtime contract](https://github.com/xyTom/coding-tools-mcp/blob/main/docs/runtime-contract-v0.3.md) 为准。

@@ -15,6 +15,7 @@
     "check": "npm run lint && npm run types:check && npm run build && npm run check:export"
   },
   "dependencies": {
+    "@fumadocs/language": "^0.2.7",
     "cn": "^0.3.0",
     "fumadocs-core": "16.15.17",
     "fumadocs-mdx": "15.4.5",

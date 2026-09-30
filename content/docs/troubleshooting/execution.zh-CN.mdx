@@ -1,0 +1,44 @@
+---
+title: Exec command 故障排查
+description: 排查命令执行与沙箱失败。
+---
+
+`exec_command` 会保留原始 `stdout`、`stderr` 和 `exit_code`，同时可能返回常见失败的结构化 `diagnostics`。
+
+常见 code：
+
+- `DEV_NULL_DENIED`：Landlock 对 `/dev/null` 的 special-device rule 不正确。
+- `TMPDIR_NOT_WRITABLE`：配置的临时目录不可写。
+- `HOME_NOT_WRITABLE`：配置的 home 目录不可写。
+- `DNS_RESOLUTION_FAILED`：resolver 配置或 network / DNS 失败。
+- `NETWORK_PERMISSION_REQUIRED`：safe mode 阻止了看起来需要网络的命令。
+- `SHELL_EXPANSION_PERMISSION_REQUIRED`：safe mode 阻止 shell expansion。
+- `INLINE_SCRIPT_PERMISSION_REQUIRED`：safe mode 阻止 inline interpreter / shell code。
+- `LANDLOCK_READ_ROOT_BLOCKED`：工具链需要读取的路径没有加入 read roots。
+- `SECRET_ENV_REJECTED`：secret-looking 或 loader/startup 环境变量被拒绝。
+- `COMMAND_TIMED_OUT`：命令超过 `timeout_ms`。
+- `OUTPUT_TRUNCATED`：stdout 或 stderr 超过 output limit。
+
+常用显式探针：
+
+```bash
+dd if=/dev/null of=/dev/null bs=1 count=0
+echo hi >/dev/null
+printf ok > "$HOME/coding-tools-write-test"
+printf ok > "$TMPDIR/coding-tools-write-test"
+cat /etc/resolv.conf && getent hosts repo.maven.apache.org
+```
+
+## 工具链版本不对（nvm、pyenv、rbenv、asdf）
+
+典型现象：终端中 `node --version` 是 v24，但通过 `exec_command` 执行却变成系统 Node（例如 v18）。
+
+原因通常是 version manager 只在 interactive shell rc（如 `~/.zshrc`、`~/.bashrc`）中把 shim/bin 目录放到 `PATH` 前面。如果启动 MCP server 的 host 是 GUI 应用（desktop app、IDE），它往往只继承系统最小 `PATH`。而 `exec_command` 在默认 `core` policy 下继承 server process 的 `PATH`，因此解析到系统版本。
+
+建议按以下顺序处理：
+
+1. **在 launcher 中解析 login-shell PATH。** 如果你控制启动 server 的进程，在 startup 时向用户 login shell 获取一次 `PATH`，然后用它 spawn server。这样即使 host 从 GUI 启动，nvm 等版本管理器仍能工作。
+2. **显式传 PATH。** 在 MCP host config 的 `env` block 中传入，或使用工具链的绝对路径。
+3. **放宽环境继承。** 如果命令还需要 `NVM_DIR`、`GOPATH`、`JAVA_HOME` 等变量，使用 `--shell-env-inherit all` / `CODING_TOOLS_MCP_SHELL_ENV_INHERIT=all`。Dangerous mode 以外仍会过滤敏感变量。
+
+这种策略类似 Codex 的 `shell_environment_policy.inherit = "all"`，但 Coding Tools MCP 默认仍保持更严格的 `core` policy。

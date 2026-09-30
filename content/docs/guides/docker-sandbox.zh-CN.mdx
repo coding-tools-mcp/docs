@@ -1,0 +1,103 @@
+---
+title: Docker 沙箱
+description: 在一次性、预装常见工具链的容器中运行 Coding Tools MCP。
+---
+
+Docker image 提供一种“工具链已准备好”的沙箱部署形态。它不会猜项目类型，也不会偷偷执行 install / build / test。
+
+本地构建：
+
+```bash
+docker build -t coding-tools-mcp-sandbox:local .
+```
+
+JDK major version 通过 build argument `ARG JAVA_VERSION=17` 统一定义。需要 Java 21 时：
+
+```bash
+docker build --build-arg JAVA_VERSION=21 -t coding-tools-mcp-sandbox:local .
+```
+
+针对当前仓库运行：
+
+```bash
+docker run --rm --init -it \
+  -p 8765:8765 \
+  -v "$PWD:/workspace" \
+  coding-tools-mcp-sandbox:local
+```
+
+容器 entrypoint 就是 `coding-tools-mcp` server。镜像内默认配置：
+
+```text
+CODING_TOOLS_MCP_WORKSPACE=/workspace
+CODING_TOOLS_MCP_HOST=0.0.0.0
+CODING_TOOLS_MCP_PORT=8765
+CODING_TOOLS_MCP_PERMISSION_MODE=trusted
+CODING_TOOLS_MCP_GENERATE_AUTH_TOKEN=1
+```
+
+这等价于针对 `/workspace` 运行：
+
+```text
+coding-tools-mcp --host 0.0.0.0 --port 8765 --permission-mode trusted
+```
+
+任何配置都可以用 `docker run -e` 覆盖。
+
+因为容器监听 `0.0.0.0`，HTTP server 必须有认证。如果既没有设置 `CODING_TOOLS_MCP_AUTH_TOKEN`，也没有开启 OAuth，server 会在启动时自动生成 bearer token 并打印到 stderr。设置 `CODING_TOOLS_MCP_AUTH_MODE=noauth` 会关闭自动生成；此时如果仍尝试无凭据地非 loopback bind，server 会直接失败。
+
+镜像还为容器工具链配置文件提供默认 `CODING_TOOLS_MCP_EXEC_ALLOW_ROOTS`：
+
+```text
+/etc/java-17-openjdk:/etc/maven
+```
+
+`/usr` 下的 JVM、Maven 等安装路径本来就是 Landlock 内建 read root，`JAVA_HOME` 也会自动加入。需要替换默认值时显式设置 `CODING_TOOLS_MCP_EXEC_ALLOW_ROOTS`。
+
+需要固定 token 时：
+
+```bash
+docker run --rm -it \
+  -p 8765:8765 \
+  -e CODING_TOOLS_MCP_AUTH_TOKEN="$(python3 -c 'import secrets; print(secrets.token_urlsafe(32))')" \
+  -v "$PWD:/workspace" \
+  coding-tools-mcp-sandbox:local
+```
+
+Dangerous mode 必须显式开启：
+
+```bash
+docker run --rm -it \
+  -p 8765:8765 \
+  -e CODING_TOOLS_MCP_PERMISSION_MODE=dangerous \
+  -v "$PWD:/workspace" \
+  coding-tools-mcp-sandbox:local
+```
+
+Server 会打印警告：
+
+```text
+WARNING: permission_mode=dangerous disables MCP safety gates. Use only inside an isolated container or VM.
+```
+
+## 生命周期与停止
+
+Server 在容器里通常作为 PID 1，因此退出行为非常重要：
+
+- **`docker stop` / `docker compose stop`** 会发送 SIGTERM。Server 安装了 SIGTERM handler，并会快速以 143（128+15）退出。
+- **`--rm`** 或 `docker compose down` 会在退出后删除容器，避免累积大量 stopped container。
+- **`--init`**（compose 中为 `init: true`）使用最小 init 作为 PID 1，负责回收 `exec_command` 子进程留下的 zombie。长时间运行的 sandbox 推荐开启。
+- **容器内 stdio mode**：`docker run --rm -i ... --stdio` 会在 stdin EOF 时退出。MCP host 退出后 pipe 关闭，server 随之停止，`--rm` 自动清理容器。保留 `-i`，不要使用 `-t`，让 stdin 继续是 host 控制的 pipe。
+
+CI 的 smoke check 应通过显式 `exec_command` 执行，例如：
+
+```bash
+java -version
+javac -version
+mvn -version
+gcc --version
+node --version && npm --version
+python --version
+go version
+cargo --version && rustc --version
+```

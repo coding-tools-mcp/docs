@@ -4,6 +4,8 @@ The documentation website for [Coding Tools MCP](https://github.com/xyTom/coding
 
 Published site: https://coding-tools-mcp.github.io/docs/
 
+Simplified Chinese: https://coding-tools-mcp.github.io/docs/zh-CN/
+
 ## Development
 
 Requires Node.js 22+ and npm.
@@ -42,6 +44,23 @@ The generated site is uploaded from `out/`; no Next.js server is required.
 This repository owns user-facing tutorials, setup guides, migration guides, and troubleshooting content.
 
 Runtime contracts, tool schemas, security invariants, CI evidence, and benchmark evidence remain authoritative in the core repository. Link to those sources instead of copying them here.
+
+## Languages
+
+English is the default language and keeps prefix-free URLs. Simplified Chinese uses
+`/zh-CN/`.
+
+Localized content uses Fumadocs locale suffixes:
+
+```text
+content/docs/getting-started/index.mdx
+content/docs/getting-started/index.zh-CN.mdx
+content/docs/getting-started/meta.json
+content/docs/getting-started/meta.zh-CN.json
+```
+
+`npm run check` fails if an English user-facing page or navigation metadata file
+is missing its Simplified Chinese counterpart.
 
 ## Repositories
 

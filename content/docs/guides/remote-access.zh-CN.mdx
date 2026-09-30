@@ -1,0 +1,149 @@
+---
+title: 远程访问
+description: 通过 HTTPS 安全发布本地 Coding Tools MCP server。
+---
+
+`coding-tools-mcp` 在 `/mcp` 暴露 Streamable HTTP。建议始终只监听 loopback，再通过 HTTPS 隧道发布。固定 tool set 中包含 `apply_patch` 和 `exec_command`，不存在一个自动缩减的“只读工具集”，因此任何公网部署都必须使用 bearer auth、OAuth，或外部 authenticated proxy。
+
+## 一条命令启动 bearer tunnel
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/xyTom/coding-tools-mcp/main/scripts/install.sh \
+  | bash -s -- --tunnel cloudflared --auto-install-tunnel --workspace /path/to/repo
+```
+
+脚本会生成 bearer token，让 server 监听 `127.0.0.1`，并打印 HTTPS tunnel URL 与 header：
+
+```text
+URL: https://<tunnel-host>/mcp
+Header: Authorization: Bearer <token>
+```
+
+如果从源码 checkout 运行，对应命令是：
+
+```bash
+export CODING_TOOLS_MCP_AUTH_TOKEN="$(python3 -c 'import secrets; print(secrets.token_urlsafe(32))')"
+CODING_TOOLS_MCP_AUTH_MODE=bearer integrations/tunnels/tunnel.sh cloudflared /path/to/repo
+```
+
+脚本同样支持 `ngrok` 和 `devtunnel`。
+
+## OAuth 2.1 + dynamic registration
+
+对于不能设置静态 `Authorization` header、但支持 MCP OAuth discovery 的客户端：
+
+```bash
+CODING_TOOLS_MCP_AUTH_MODE=oauth \
+integrations/tunnels/tunnel.sh cloudflared /path/to/repo
+```
+
+Server 实现 Authorization Code + PKCE S256 和 RFC 7591 dynamic client registration。客户端可以自行发现并注册，不需要操作人员手工生成 client ID，也不需要把 client secret 复制进 MCP host。脚本会打印 operator 在授权页面输入的 password。
+
+Discovery 与 OAuth endpoint：
+
+- `GET /.well-known/oauth-protected-resource`
+- `GET /.well-known/oauth-authorization-server`
+- `POST /oauth/register`
+- `GET /oauth/authorize`
+- `POST /oauth/authorize`
+- `POST /oauth/token`
+
+注册规则：
+
+- `redirect_uris` 必填、必须唯一，并做精确匹配。
+- 支持 HTTPS redirect。HTTP 仅允许 `localhost`、`127.0.0.1` 或 `::1` loopback callback。
+- 支持 `none`、`client_secret_post`、`client_secret_basic` 三种 token authentication method；客户端必须使用自己注册时声明的方法。
+- Client secret 以 digest 保存；public client 必须使用 PKCE。
+- 注册信息和 authorization code 仅保存在当前进程内；server 重启后 dynamic client 需要重新注册。
+
+Authorization code 只能使用一次，5 分钟过期。Access token 默认有效期 24 小时，并绑定到已注册 client 和精确的 MCP resource URL。
+
+## OAuth 配置
+
+```bash
+# 未设置时自动生成并打印：
+CODING_TOOLS_MCP_OAUTH_PASSWORD=<authorize-page-password>
+
+# 可选：稳定公网 origin，不包含 /mcp：
+CODING_TOOLS_MCP_SERVER_URL=https://mcp.example.com
+
+# 可选：稳定 HS256 key，hex 编码：
+CODING_TOOLS_MCP_OAUTH_TOKEN_SECRET=<hex-key>
+
+# 可选：token 有效期，单位秒；默认 86400：
+CODING_TOOLS_MCP_OAUTH_TOKEN_TTL=86400
+```
+
+使用临时 tunnel 时可以不设置 `CODING_TOOLS_MCP_SERVER_URL`，server 会从请求中推导外部 origin。使用固定域名时建议显式设置，以保证 issuer、audience、resource 与 discovery URL 稳定。
+
+Server 默认忽略 `Forwarded` 与 `X-Forwarded-*`。只有在你控制的 proxy 后面才设置 `CODING_TOOLS_MCP_TRUST_PROXY_HEADERS=1`。浏览器 origin 可以通过逗号分隔的 `CODING_TOOLS_MCP_ALLOWED_ORIGINS` 精确配置。
+
+### 可选：预注册 client
+
+Dynamic registration 是默认方案，也可以额外预注册一个已知 client：
+
+```bash
+CODING_TOOLS_MCP_OAUTH_CLIENT_ID=<client-id>
+CODING_TOOLS_MCP_OAUTH_REDIRECT_URIS=https://client.example/callback,http://127.0.0.1/callback
+CODING_TOOLS_MCP_OAUTH_CLIENT_SECRET=<optional-confidential-secret>
+```
+
+如果配置了 client ID，那么 redirect URI 列表就是正式运行配置的一部分；生产环境不要依赖默认 loopback fallback。
+
+## HTTP session 行为
+
+从 0.3.0 开始，这个 endpoint 是 stateless 的：
+
+- response 不再包含 `Mcp-Session-Id`；
+- 老客户端继续发送旧 session header 时会被忽略，而不是报错；
+- `DELETE /mcp` 返回 `405` 与 `Allow: POST`，因为没有 session 可以终止。
+
+每个请求都由拥有该 workspace 的同一个 runtime 处理。因此客户端可以重连、切换 transport，或者多个客户端并行使用，而不会丢失 workspace 状态。
+
+Command 是 workspace 资源，有独立 timeout、数量、output 与 retention 限制。任何通过该 workspace 认证的客户端，只要知道 `exec_command` 返回的 `command_id`，都可以继续操作对应 command。
+
+握手式客户端不需要任何改动：仍然发送 `initialize`，仍然获得相同的 `InitializeResult`，只是没有 session header 需要回传。
+
+`2026-07-28` 客户端完全不握手。每个请求通过 `params._meta` 声明版本，并通过 header 镜像版本和 method；`tools/call`、`resources/read`、`prompts/get` 还要发送 `Mcp-Name`：
+
+```bash
+curl "$BASE_URL/mcp" \
+  -H "Authorization: Bearer $CODING_TOOLS_MCP_AUTH_TOKEN" \
+  -H "Accept: application/json, text/event-stream" \
+  -H "Content-Type: application/json" \
+  -H "MCP-Protocol-Version: 2026-07-28" \
+  -H "Mcp-Method: server/discover" \
+  --data '{"jsonrpc":"2.0","id":1,"method":"server/discover","params":{"_meta":{"io.modelcontextprotocol/protocolVersion":"2026-07-28","io.modelcontextprotocol/clientCapabilities":{}}}}'
+```
+
+Header 与 body 冲突，或现代协议请求缺少 mirror header，会返回 `400` / `-32020`。未知 method 在现代协议中返回 `404` / `-32601`；握手式协议保持 JSON-RPC error 的 `200` 行为。
+
+当前实现对 `GET /mcp` 返回 `405`，因为不提供 SSE stream。JSON-RPC batch 会被拒绝。两代协议都接受 `notifications/cancelled` 且不返回 body；该 notification 不会终止已经启动的 command，需要使用 `kill_command`。
+
+## 本地检查
+
+将 `BASE_URL` 替换为 HTTPS origin，不要包含 `/mcp`：
+
+```bash
+curl "$BASE_URL/.well-known/mcp.json"
+curl "$BASE_URL/.well-known/oauth-protected-resource"
+curl "$BASE_URL/.well-known/oauth-authorization-server"
+```
+
+Bearer mode 下，无认证请求必须返回 `401`；正确 token 应能完成 MCP initialize：
+
+```bash
+curl "$BASE_URL/mcp" \
+  -H "Authorization: Bearer $CODING_TOOLS_MCP_AUTH_TOKEN" \
+  -H "Accept: application/json, text/event-stream" \
+  -H "Content-Type: application/json" \
+  --data '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2025-11-25","capabilities":{},"clientInfo":{"name":"smoke","version":"1"}}}'
+```
+
+## 安全注意事项
+
+- 不要把 `CODING_TOOLS_MCP_AUTH_MODE=noauth` 发布到公网。它只适合本机 loopback。
+- 使用 HTTPS，定期轮换 bearer token，并把 OAuth password / signing key 保持在版本控制之外。
+- MCP runtime 建议使用 `safe` 或 `trusted`；只有在隔离容器或 VM 且 client 可信时才使用 `dangerous`。
+- HTTPS tunnel 只负责 transport authentication，并不等价于代码执行沙箱。对于不可信仓库，server policy 与 Landlock 不能替代外部 sandbox。
+- 公网 endpoint 不建议启用 `--dangerously-fake-readonly-annotations`。它会把 mutating tool 报告为 read-only，使远端客户端无法从 `tools/list` 判断 `apply_patch` 和 `exec_command` 实际可修改系统。可以检查 `server_info.annotation_override` 或 server card 中的 `tools.annotationOverride` 判断是否启用了该行为。

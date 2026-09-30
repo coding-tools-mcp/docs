@@ -1,0 +1,182 @@
+---
+title: MCP 客户端配置
+description: 在常见 MCP 客户端中配置 Coding Tools MCP。
+---
+
+Coding Tools MCP 同时支持两代协议。使用 `2026-07-28` 的客户端不需要握手：通过 `server/discover` 发现 server，并在每个请求中声明协议版本。握手式客户端使用 `2025-11-25`，现有客户端仍可继续使用 `2025-06-18`。
+
+## Claude Desktop
+
+编辑 `claude_desktop_config.json`。macOS 路径为 `~/Library/Application Support/Claude/`，Windows 路径为 `%APPDATA%\Claude\`。保存后重启 Claude Desktop：
+
+```json
+{
+  "mcpServers": {
+    "coding-tools": {
+      "command": "uvx",
+      "args": ["coding-tools-mcp", "--stdio", "--workspace", "/path/to/repo"]
+    }
+  }
+}
+```
+
+## Codex
+
+```toml
+[mcp_servers.coding_tools]
+command = "uvx"
+args = ["coding-tools-mcp", "--stdio", "--workspace", "/path/to/repo"]
+```
+
+## Claude Code
+
+```json
+{
+  "mcpServers": {
+    "coding-tools": {
+      "command": "uvx",
+      "args": ["coding-tools-mcp", "--stdio", "--workspace", "/path/to/repo"]
+    }
+  }
+}
+```
+
+也可以直接使用命令行：
+
+```bash
+claude mcp add coding-tools -- uvx coding-tools-mcp --stdio --workspace /path/to/repo
+```
+
+## Cursor
+
+```json
+{
+  "mcpServers": {
+    "coding-tools": {
+      "command": "uvx",
+      "args": ["coding-tools-mcp", "--stdio", "--workspace", "/path/to/repo"]
+    }
+  }
+}
+```
+
+## VS Code
+
+GitHub Copilot 会读取工作区中的 `.vscode/mcp.json`：
+
+```json
+{
+  "servers": {
+    "coding-tools": {
+      "type": "stdio",
+      "command": "uvx",
+      "args": ["coding-tools-mcp", "--stdio", "--workspace", "/path/to/repo"]
+    }
+  }
+}
+```
+
+如果使用本地 HTTP server，则将 `"type"` 改为 `"http"`，并配置 `"url"` 与 `"headers"`。
+
+## Windsurf
+
+编辑 `~/.codeium/windsurf/mcp_config.json`，然后重启 Windsurf：
+
+```json
+{
+  "mcpServers": {
+    "coding-tools": {
+      "command": "uvx",
+      "args": ["coding-tools-mcp", "--stdio", "--workspace", "/path/to/repo"]
+    }
+  }
+}
+```
+
+## Gemini CLI
+
+默认以 project scope 添加：
+
+```bash
+gemini mcp add coding-tools -- uvx coding-tools-mcp --stdio --workspace /path/to/repo
+```
+
+也可以编辑 `~/.gemini/settings.json`（user scope）或 `.gemini/settings.json`（project scope）：
+
+```json
+{
+  "mcpServers": {
+    "coding-tools": {
+      "command": "uvx",
+      "args": ["coding-tools-mcp", "--stdio", "--workspace", "/path/to/repo"]
+    }
+  }
+}
+```
+
+如果使用本地 HTTP server：
+
+```bash
+gemini mcp add --transport http coding-tools http://127.0.0.1:8765/mcp
+```
+
+带认证的 endpoint 可以通过 `--header "Authorization: Bearer <token>"` 传入 token。Server name 尽量不要使用下划线：Gemini CLI 会根据名称生成 tool name，并在第一个下划线处分割。
+
+## Continue、Cursor、Cline 与通用 HTTP 客户端
+
+配置 Streamable HTTP MCP server：
+
+```text
+http://127.0.0.1:8765/mcp
+```
+
+这个 server 默认设计用于本机 loopback。没有外部认证和沙箱时，不要直接绑定到公网 interface。
+
+## Remote MCP
+
+远程客户端应继续让 server 只监听 loopback，再通过带认证的 HTTPS 隧道暴露。固定 tool set 中包含 mutation 与命令执行能力：
+
+```bash
+CODING_TOOLS_MCP_AUTH_MODE=bearer \
+integrations/tunnels/tunnel.sh cloudflared /path/to/repo
+```
+
+远程客户端配置：
+
+```text
+URL: https://<tunnel-host>/mcp
+```
+
+如果客户端支持自定义 `Authorization` header，可以使用静态 bearer token。支持 OAuth 的 MCP 客户端可以使用 `--oauth-mode`：server 会发布 protected-resource / authorization-server discovery、RFC 7591 dynamic registration 和 PKCE authorization flow。如果两者都不支持，则需要外部 authenticated proxy。详见 [远程访问](/zh-CN/guides/remote-access)。
+
+## ChatGPT
+
+ChatGPT 是云端客户端，不能直接启动你的本地进程，因此必须使用上面的 authenticated HTTPS tunnel。ChatGPT 的 custom connector 支持 OAuth 或 no-auth，但没有地方让你手工填静态 bearer header。
+
+```bash
+CODING_TOOLS_MCP_AUTH_MODE=oauth integrations/tunnels/tunnel.sh cloudflared /path/to/repo
+```
+
+在 ChatGPT 中开启 developer mode（Settings → Connectors → Advanced settings），然后创建 custom connector，URL 指向 `https://<tunnel-host>/mcp`。
+
+如果 ChatGPT 能自动发现 OAuth endpoint，授权页面会要求输入脚本打印的 password。如果 connector 表单要求手动填写：
+
+- Authorization URL：`https://<tunnel-host>/oauth/authorize`
+- Token URL：`https://<tunnel-host>/oauth/token`
+- Client ID / secret：使用预注册 client。启动 tunnel 前设置 `CODING_TOOLS_MCP_OAUTH_CLIENT_ID`、`CODING_TOOLS_MCP_OAUTH_CLIENT_SECRET` 和 `CODING_TOOLS_MCP_OAUTH_REDIRECT_URIS`，其中 redirect URI 使用 ChatGPT 表单显示的值。
+
+## Grok
+
+grok.com 同样是纯云端客户端。启动相同的 OAuth tunnel，然后在 grok.com/connectors（Settings → Connectors）中添加 `https://<tunnel-host>/mcp`；Grok 会在 popup 中完成 OAuth。
+
+如果通过 xAI API 使用，则可以使用静态 bearer tunnel：
+
+```json
+{
+  "server_url": "https://<tunnel-host>/mcp",
+  "server_label": "coding_tools",
+  "authorization": "<CODING_TOOLS_MCP_AUTH_TOKEN>"
+}
+```
+
+Grok 侧只支持 Streamable HTTP 和 SSE transport；我们的 tunnel 已经提供所需的 HTTP transport。

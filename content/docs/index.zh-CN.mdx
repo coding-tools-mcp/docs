@@ -1,0 +1,20 @@
+---
+title: 文档
+description: 了解如何安装、配置、安全运行和使用 Coding Tools MCP。
+---
+
+Coding Tools MCP 是一个通过 Model Context Protocol 提供能力、与具体模型无关的编码 runtime。它让 MCP 客户端可以在你明确配置的工作区内进行文件访问、结构化代码修改、命令执行、交互式进程管理和 Git 操作。
+
+## 从这里开始
+
+- [快速开始](/zh-CN/getting-started) — 安装 runtime，并连接第一个 MCP 客户端。
+- [客户端配置](/zh-CN/clients) — 配置 ChatGPT、Claude、Cursor、VS Code 等 MCP host。
+- [远程访问](/zh-CN/guides/remote-access) — 通过带认证的 HTTPS 隧道安全暴露本地 runtime。
+- [Docker 沙箱](/zh-CN/guides/docker-sandbox) — 在一次性容器中运行不可信工作负载。
+- [故障排查](/zh-CN/troubleshooting) — 排查协议、传输和 runtime 问题。
+
+## 项目仓库
+
+核心 runtime 仍位于 [xyTom/coding-tools-mcp](https://github.com/xyTom/coding-tools-mcp)。Desktop 应用独立维护在 [coding-tools-mcp/desktop](https://github.com/coding-tools-mcp/desktop)。
+
+与源码强耦合的 runtime contract、schema、安全边界和测试证据继续以核心仓库为准。权威入口见 [参考资料](/zh-CN/reference)。

@@ -1,0 +1,108 @@
+---
+title: 快速开始
+description: 安装 Coding Tools MCP，并连接你的第一个 MCP 客户端。
+---
+
+从 PyPI 安装已发布版本：
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/xyTom/coding-tools-mcp/main/scripts/install.sh | bash
+```
+
+安装并针对指定工作区启动本地 Streamable HTTP：
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/xyTom/coding-tools-mcp/main/scripts/install.sh \
+  | bash -s -- --start --workspace /path/to/repo
+```
+
+安装并通过带 bearer token 认证的隧道暴露服务：
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/xyTom/coding-tools-mcp/main/scripts/install.sh \
+  | bash -s -- --tunnel cloudflared --auto-install-tunnel --workspace /path/to/repo
+```
+
+如果你已经 clone 了源码仓库，也可以直接运行：
+
+```bash
+scripts/install.sh
+```
+
+无需永久安装，直接运行已发布 package：
+
+```bash
+uvx coding-tools-mcp --workspace .
+```
+
+给支持 stdio 的 MCP 客户端使用：
+
+```bash
+uvx coding-tools-mcp --stdio --workspace /path/to/repo
+```
+
+如果你是从源码 checkout 开发，而不是使用发布包，可以启动 Streamable HTTP：
+
+```bash
+make start
+```
+
+默认 endpoint：
+
+```text
+http://127.0.0.1:8765/mcp
+```
+
+通过 Make 变量指定不同工作区、host、port 或额外 server 参数：
+
+```bash
+make start MCP_WORKSPACE=/path/to/repo MCP_PORT=8000 MCP_ARGS="--permission-mode trusted"
+```
+
+如果依赖尚未安装，以 editable 模式安装开发环境：
+
+```bash
+python -m pip install -e ".[dev]"
+```
+
+直接启动 stdio：
+
+```bash
+coding-tools-mcp --stdio --workspace /path/to/repo
+```
+
+运行项目 acceptance gate：
+
+```bash
+make compliance
+```
+
+本地需要 trace 调试时：
+
+```bash
+CODING_TOOLS_MCP_TRACE=1 coding-tools-mcp --workspace /path/to/repo
+```
+
+Trace 会以 JSON Lines 写入 stderr。
+
+如果某些工具链必须继承 shell 环境变量，可以放宽 shell environment policy：
+
+```bash
+CODING_TOOLS_MCP_SHELL_ENV_INHERIT=all coding-tools-mcp --workspace /path/to/repo
+```
+
+本地开发如果需要下载依赖、shell expansion 或 inline interpreter snippet，使用 trusted mode：
+
+```bash
+coding-tools-mcp --permission-mode trusted --workspace /path/to/repo
+```
+
+如果你只是希望兼容旧配置、放开“看起来需要网络”的命令 gate，`--allow-network` 仍保留为兼容参数。
+
+如果 MCP 客户端无法显示权限确认，而且你**明确**想在隔离的容器或 VM 中关闭 `exec_command` 权限 gate：
+
+```bash
+coding-tools-mcp --permission-mode dangerous --workspace /path/to/repo
+```
+
+只在可信工作区、可信客户端以及已经由外部环境完成隔离的场景中使用 dangerous mode。`--dangerously-skip-all-permissions` 仍作为兼容 alias 保留。

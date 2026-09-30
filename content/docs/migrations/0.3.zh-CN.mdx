@@ -1,0 +1,110 @@
+---
+title: 迁移到 0.3
+description: Coding Tools MCP 0.3 的 breaking change 与协议迁移说明。
+---
+
+0.3.0 新增 MCP `2026-07-28`，并从 server 中移除所有 HTTP session。握手时代客户端仍按原方式连接，`2025-11-25` 与 `2025-06-18` 的 wire shape 不变，但 tool catalog、HTTP transport 与部分 `server_info` 字段发生变化。
+
+权威 contract 仍以核心仓库的 [runtime contract v0.3](https://github.com/xyTom/coding-tools-mcp/blob/main/docs/runtime-contract-v0.3.md) 为准。
+
+如果你只需要修复 OpenAI connector 无法完成 tool scan 的问题（[issue #39](https://github.com/xyTom/coding-tools-mcp/issues/39)），该修复最早作为 **0.2.3** 发布；升级到 0.3.0 才包含下面的协议变化。
+
+## Breaking changes
+
+### 两个 cwd tool 被移除，catalog 变为 18 个 tool
+
+`get_default_cwd` 与 `set_default_cwd` 被移除。既然 server 不再有 session，也就没有 session-scoped working directory：
+
+- 文件与 Git tool 的相对 `path` 始终相对于 workspace root。
+- `exec_command.workdir` 用于在其他目录执行命令，默认同样是 workspace root。
+- `read_file.next_action` 会继续返回调用时使用的 workspace-relative path；客户端不应再根据 session cwd 二次 rebase。
+
+### HTTP 不再有 session
+
+- Response 不再包含 `Mcp-Session-Id`。
+- 老客户端继续发送旧 session header 时会被正常服务，不再返回 `-32001 Unknown MCP session`。
+- `DELETE /mcp` 返回 `405` / `Allow: POST`，因为没有 session 可以 terminate。
+- 原来的 128 session 上限、`503`、idle expiry，以及“请求协议版本必须匹配 session”的检查都随 session 一起移除。
+
+MCP 规范本来就把 session header 定义为 MAY，因此把它当 optional 的客户端无需修改。
+
+### Handshake 不再是 admission gate
+
+即使没有先执行 `initialize`，`tools/list`、`tools/call` 等已实现 method 也会直接服务。`-32002 Server not initialized` 不再返回。
+
+`initialize` 现在是 idempotent 的：每次调用独立协商版本，不再因为同一进程已经初始化为另一个版本而报错。
+
+### `notifications/cancelled` 不再终止 command
+
+该 notification 仍会被接受，也仍然不返回 body，但不会再杀死对应 command。
+
+旧实现通过客户端 JSON-RPC id 做映射；两个客户端都使用 `id: 1` 是正常情况，却可能互相取消对方 command。现在需要使用带全局 `command_id` 的 `kill_command`。
+
+Prompt cancellation 的更快响应仍是已知限制，见 [issue #48](https://github.com/xyTom/coding-tools-mcp/issues/48)。
+
+### Command handle 统一改名为 `command_id`
+
+| 0.2.x | 0.3.0 |
+| --- | --- |
+| `kill_session` | `kill_command` |
+| `write_stdin` / `kill_session` 的 `session_id` | `command_id` |
+| `session:<id>:stdout` / `session:<id>:stderr` | `command:<command_id>:stdout` / `command:<command_id>:stderr` |
+
+旧名字不再接受。Command 属于 workspace，而不是“启动它的那个客户端”；同一个 workspace 下任何已认证客户端都可以通过 `command_id` 继续、读取或终止 command。
+
+### `server_info` 字段变化
+
+| 0.2.x | 0.3.0 |
+| --- | --- |
+| `protocol_version`：session 协商出的单一版本 | `supported_protocol_versions`：server 支持的全部版本，新版本在前 |
+| `default_cwd` | 移除 |
+| — | `output_retention`：每个 stream 的静态 buffer budget |
+
+实际 output omission / eviction 计数属于 process telemetry，而不是某个客户端请求的 server info，因此放在 `session_end` telemetry event 中。详见 [Telemetry](https://github.com/xyTom/coding-tools-mcp/blob/main/docs/telemetry.md)。
+
+### Server card 改为版本列表
+
+`/.well-known/mcp.json` 与 `/.well-known/mcp/server-card.json` 使用 `supportedProtocolVersions` 替换单一 `protocolVersion`：
+
+```json
+{"supportedProtocolVersions": ["2026-07-28", "2025-11-25", "2025-06-18"]}
+```
+
+## 行为变化
+
+**`initialize` 会 downgrade 而不是失败。** 请求一个 server 不支持的 handshake 版本时，会返回 server 支持的最新版本，而不是 `-32602`。请求 `2026-07-28` 的 handshake 也会降级，因为这个版本通过每个 request 自己声明，不参与握手协商。
+
+**缺少 `MCP-Protocol-Version` header 时按 `2025-11-25` 处理。** Server 从未支持 `2025-03-26`，因此不会假装使用一个后续也无法继续通信的版本。
+
+**Legacy result 保持 legacy shape。** `2026-07-28` 新增的 `resultType`、server identity `_meta`、`ttlMs`、`cacheScope` 只会出现在现代协议请求的响应中；握手式客户端看到的结果保持原样。
+
+## `2026-07-28` 客户端需要知道什么
+
+这是新协议，不存在“从旧版迁移”的问题，但实现双协议客户端时需要注意：
+
+- `server/discover` 可以直接 probe server，报告 `supportedVersions`、`tools` capability 与 workspace instruction，因此支持现代协议的客户端不需要 handshake。
+- HTTP 请求必须用 `MCP-Protocol-Version` 和 `Mcp-Method` 镜像 body；对 `tools/call`、`resources/read`、`prompts/get` 还必须发送 `Mcp-Name`。
+- Header/body mismatch、缺少 mirror header、或重复 header 都是 `400` / `-32020`。
+- 如果 fallback 到 handshake，要同时移除现代 header。不要在 `initialize` body 没有现代 `_meta` 时继续发送 `MCP-Protocol-Version: 2026-07-28`。
+
+## Compliance 说明
+
+0.3.0 对 `2026-07-28` 声明 **full support**，目前仅 advertise `tools` capability。已实现 method 在现代协议中都包含所需的 `_meta` 校验、mirror header、error code 与 result shaping。
+
+需要明确的一个实现质量缺口是 cancellation：规范要求的 client-observable 行为已经满足，但已经开始的工作不会因为 `notifications/cancelled` 立刻停止。当前 mitigation 是 `exec_command` foreground window 与显式 `kill_command`；追踪见 [issue #48](https://github.com/xyTom/coding-tools-mcp/issues/48)。
+
+## Operator 警告：一个 workspace 就是一个 trust domain
+
+移除 session 后，这一点变得更加明确：**所有能认证到同一个 workspace 的客户端共享同一个 runtime 和资源池。**
+
+- Command 共享：任何客户端都可以 `read_output`、`write_stdin` 或 `kill_command` 其他客户端启动的 command。
+- Output cursor 全局消费：两个客户端 poll 同一个 `command_id` 时会分走 output，而不是各自看到一份完整副本。
+- Patch state 共享：并发 `apply_patch` 会序列化，避免静默丢更新；后执行的一方可能收到 conflict。
+- Quota 是 workspace 级，不是 client 级；活跃 command、retained output entry 和 byte budget 都来自同一个 pool。
+
+互不信任的客户端应使用不同 server process、不同 workspace 和不同 credential。Per-client identity / quota 见 [issue #46](https://github.com/xyTom/coding-tools-mcp/issues/46)，安全边界见 [SECURITY.md](https://github.com/xyTom/coding-tools-mcp/blob/main/SECURITY.md) 与 [known limitations](https://github.com/xyTom/coding-tools-mcp/blob/main/docs/limitations.md)。
+
+## 值得知道的非 breaking fix
+
+- 两个客户端同时 patch 同一文件时不再静默丢更新；patch lock 覆盖同一 workspace 内所有客户端。
+- 同一个持久 stdio process 重复 `initialize` 会正常返回，不再拒绝。这正是 issue #39 connector 问题的关键修复，并最早随 0.2.3 发布。

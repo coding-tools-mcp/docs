@@ -1,0 +1,70 @@
+---
+title: 故障排查
+description: 排查协议、传输、沙箱和 runtime 问题。
+---
+
+## 协议版本错误
+
+每个 HTTP 请求都应该发送 `MCP-Protocol-Version`。使用 `2026-07-28` 的客户端发送 `MCP-Protocol-Version: 2026-07-28`，并在 `params._meta` 中重复版本。如果 header 与 body 不一致，或者现代协议请求缺少该 header，server 会返回 `400` / `-32020`。
+
+握手式客户端发送初始化时协商出的版本，通常是 `2025-11-25`，兼容旧客户端时也可能是 `2025-06-18`。如果 header 指定 server 不认识的版本，会返回 `400` / `-32600` 并列出支持版本。完全不带 header 的请求按 `2025-11-25` 处理。
+
+如果 `initialize` 请求了 server 不支持的版本，不会直接失败；server 会返回自己支持的最新版本。怀疑客户端使用了意外协议版本时，应读取 `InitializeResult.protocolVersion`，不要只相信请求值。
+
+## SANDBOX_UNAVAILABLE
+
+如果 `exec_command` 提示 Linux Landlock 不可用，命令仍然通过 server-side policy check 执行，只是缺少 kernel filesystem confinement。这在 Windows、macOS，以及不支持 Landlock 的 Linux 主机上都是预期行为。
+
+运行不可信命令或不可信项目代码前，请把 server 放到外部 container / VM sandbox 中。
+
+老版本如果把 `SANDBOX_UNAVAILABLE` 当成 error，请升级；或者在支持 Landlock 的 Linux kernel 上运行。
+
+## 命令长时间运行或超时
+
+如果结果返回 `status: "running"`，使用空 `chars` 的 `write_stdin` 继续 poll，或用 `kill_command` 终止。即使客户端停止 polling，command deadline 仍然继续生效。
+
+## 客户端不支持 Permission Elicitation
+
+如果 `request_permissions` 返回 `ELICITATION_UNSUPPORTED`，说明当前 MCP 客户端无法展示审批提示。
+
+本地依赖下载与开发场景建议使用 `--permission-mode trusted`：允许看起来需要网络的命令、shell expansion 和 inline script，同时继续保留 secret filtering 与 destructive-command check。
+
+在隔离 container / VM 中，如果你明确希望关闭 `exec_command` permission gate，使用 `--permission-mode dangerous`。
+
+## 工具链环境变量缺失
+
+`exec_command` 默认只继承核心 shell environment。如果 MSVC、CUDA、oneAPI、Nix 等工具依赖 parent terminal 中的变量，可这样启动：
+
+```bash
+CODING_TOOLS_MCP_SHELL_ENV_INHERIT=all coding-tools-mcp --workspace /path/to/repo
+```
+
+除非同时使用 `--permission-mode dangerous`，secret-looking 与 loader/startup 变量仍会被过滤。
+
+## Exec diagnostics
+
+`exec_command` 可能返回 `diagnostics`，常见 code 包括：
+
+- `DEV_NULL_DENIED`
+- `DNS_RESOLUTION_FAILED`
+- `NETWORK_PERMISSION_REQUIRED`
+- `TMPDIR_NOT_WRITABLE`
+- `HOME_NOT_WRITABLE`
+- `COMMAND_TIMED_OUT`
+- `OUTPUT_TRUNCATED`
+
+详见 [Exec command 故障排查](/zh-CN/troubleshooting/execution)。
+
+## Trace tool call
+
+本地调试：
+
+```bash
+CODING_TOOLS_MCP_TRACE=1 coding-tools-mcp --workspace /path/to/repo
+```
+
+Trace event 以 JSON Lines 写入 stderr。Secret-looking key/value 会被脱敏；stdout 保留给 stdio JSON-RPC frame。
+
+## SWE-bench
+
+如果缺少 Docker 或 `swebench` package，默认 scaffold 应报告 `PREFLIGHT_ONLY`；显式 evaluation attempt 则应报告 `BLOCKED`，不能误报 pass。详见核心仓库的 [SWE-bench notes](https://github.com/xyTom/coding-tools-mcp/blob/main/docs/swe-bench.md)。

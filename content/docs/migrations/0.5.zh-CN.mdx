@@ -1,0 +1,109 @@
+---
+title: 迁移到 0.5
+description: Coding Tools MCP 0.5 的可靠性与 tool catalog 变化。
+---
+
+0.5.0 是一次以可靠性为主的 release。Transport 与 handshake 不变，runtime 也没有重命名或删除现有 tool；默认 advertise 的 tool 数量仍是 18，但 catalog 组成发生变化：新增 `apply_changes`，`request_permissions` 改成按 permission mode 决定是否 advertise，另外三个现有 tool 返回的信息更丰富。
+
+协议权威定义仍以 [runtime contract v0.3](https://github.com/xyTom/coding-tools-mcp/blob/main/docs/runtime-contract-v0.3.md) 为准。工程设计背景见 [v0.5.0 execution plan](https://github.com/xyTom/coding-tools-mcp/blob/main/docs/plan-v0.5.md)。
+
+## Breaking changes
+
+### `request_permissions` 只在 dangerous mode advertise
+
+在 `safe` 与 `trusted` mode 中，`request_permissions` 不再出现在 `tools/list`，因为这些模式下它始终只能返回 `ELICITATION_UNSUPPORTED`。
+
+Registry 现在一共包含 19 个 tool：
+
+- `safe` / `trusted` advertise 18 个；
+- `dangerous` advertise 全部 19 个。
+
+Safe mode 的“18 个”数量没有变化，但已经不是原来的 18 个：`request_permissions` 离开，`apply_changes` 加入。
+
+迁移建议：
+
+- 不要 hardcode catalog 或断言固定 tool count，始终读取 `tools/list`。
+- 直接调用隐藏的 `request_permissions` 仍会得到原来的 `ELICITATION_UNSUPPORTED`，不会变成 `Unknown tool`。
+- 如果确实需要它出现在 catalog，只能使用 `--permission-mode dangerous`，并且应只在隔离容器 / VM 中这么做。
+
+`write_generated_or_ignored` permission kind 从 schema 中移除；它以前只存在于 enum，没有实际请求或 grant path。
+
+### `read_file` 的 model text 现在总是以 banner 开头
+
+每个 `read_file` 结果都会先出现类似：
+
+```text
+[Showing lines 1-40 of 40 revision=9f2c…]
+```
+
+Revision 是 `apply_changes` 做 optimistic concurrency check 时必须传入的 token。很多客户端只会把 text 交给模型，如果 revision 只存在于 structured content 中，模型实际上拿不到。
+
+如果你的客户端把 `read_file` text 与文件 bytes 做精确比较，需要跳过第一行，或者直接读取未变化的 `structuredContent.content`。
+
+### `exec_command` 默认 process lifetime 变为 300 秒
+
+`timeout_ms` 默认从 30000 改为 300000。它一直表示整个 process lifetime，但旧默认值比常见 install / build 更短，导致命令虽然已经 backgrounded，随后仍会被过早杀死。
+
+Initial yield `yield_time_ms` 仍是 10000，schema 上限仍是 600000。
+
+如果你依赖旧的 30 秒默认值来限制 runaway command，请显式设置 `timeout_ms`。
+
+## 建议采用的新行为
+
+### `apply_changes`
+
+新增 line-addressed editing tool。每个 change 指定 action（`create`、`write`、`edit`、`delete`、`move`、`copy`）与 path。
+
+对于已存在文件，还要传 `read_file` 返回的 `revision`。如果文件在你读取后又被修改，会得到 `REVISION_MISMATCH`，而不是静默覆盖。
+
+主要语义：
+
+- `write` 是 upsert：目标存在时必须带 revision；目标不存在时可以不带。
+- `create` 不接受 revision，并断言目标不存在。
+- `edit`、`delete`、`move`、`copy` 都要求 revision。
+- 同一次 call 中一个 path 只能出现一次；同一文件的多个 line edit 应放在该文件唯一的 `edit` change 中。
+- LF / CRLF / CR replacement content 会先 normalize，再恢复目标文件原有 line-ending convention。
+- 完整的 line-content 与 `insert_after` / `insert_before` 边界语义以 runtime contract 为准。
+
+### `apply_patch` recovery 改进
+
+- `@@ <context>` 是**向前搜索的文本 anchor**，不是语言 scope。Anchor 必须出现在当前 cursor 之后，然后才匹配 hunk body。
+- Pure-addition hunk 如果带 anchor，会先验证 anchor，再 append 到 EOF；没有 anchor 的 pure addition 同样 append EOF。
+- `*** End of File` 会参与定位非空 old/context block。
+- Matching 分级：exact → 忽略 trailing whitespace → 忽略 indentation width；实际使用的级别通过 `match_quality` 返回。
+- 成功结果增加 `changed_ranges`、每文件 `revision` 与 `total_lines`。
+- 失败结果包含 hunk index、附近带行号文本和候选位置，方便下一次精确重试。
+- 已经应用过的 patch 可以返回 `already_applied`，但只在证据足够强、唯一且满足当前 cursor / anchor / EOF 约束时成立。
+- `apply_patch` 与 `apply_changes` 都支持可选 `idempotency_key`：同 key + 同参数会 replay 已记录成功结果；同 key + 不同参数返回 `IDEMPOTENCY_KEY_REUSED`；`dry_run` 不记录。
+- Path semantics 与 Codex 对齐：同一 envelope 中 primary path 只能出现一次；`Add File` 可替换现有文件；`Move to` 可替换 destination；不同 source 可按顺序 move 到同一 destination，后写入者获胜。
+
+### `git_diff` 默认包含 untracked file
+
+这样 `apply_patch` 新建的文件会直接出现在 diff 中。需要旧行为时传 `include_untracked: false`。
+
+## 新 startup 参数
+
+### `--workspace-mutation` 与 `--write-path`
+
+`--workspace-mutation=structured-only` 在 Landlock 层让 workspace 对 `exec_command` 只读，只允许 `apply_patch` 与 `apply_changes` 修改文件。
+
+该功能默认关闭（`unrestricted`），目前是 experimental：pytest cache、npm、cargo、gradle、git 等任何会写 worktree 的命令都可能被阻止，除非相应目录通过可重复的 `--write-path` 放开。
+
+也可通过：
+
+- `CODING_TOOLS_MCP_WORKSPACE_MUTATION`
+- `CODING_TOOLS_MCP_WRITE_PATHS`（以 `os.pathsep` 分隔）
+
+配置。
+
+最终生效 policy 会通过 `server_info.workspace_mutation_policy` 报告。完整 enforcement 需要 Landlock ABI 3+，因为 ABI 1–2 无法 deny truncate。
+
+## 不需要采取行动的行为变化
+
+- **重复失败 circuit breaker**：第三次 byte-identical、确定会产生同样 deterministic error 的 call 会直接返回 `REPEATED_CALL_BLOCKED`。修改参数后会获得新的预算。
+- 成功且真正修改 workspace 的 `apply_patch` / `apply_changes` 会清除 breaker；`already_applied` 不会。
+- Command 第一次 terminal observation 在可能写 workspace 的情况下也会清除 breaker；重复 poll 同一已完成 command 不会重复清除。
+- **Telemetry 更准确**：非零退出、timeout、signal kill 不再记为成功 tool call；terminal outcome 无论被 poll 多少次都只统计一次。连续失败按 `(tool, error code)` 追踪。
+- **Per-tool output schema**：`tools/list` 为每个 tool 返回具体 `outputSchema`，不再共用 generic envelope。
+- **非 Linux 上 `check_exec_environment` 会明确 warning**：Landlock 仅支持 Linux。
+- **`patch_lock` 文档明确为 in-process**：同一 server process 内会序列化 patch；两个独立 server 指向同一 workspace 时，只能依靠 pre-commit baseline recheck 保护。

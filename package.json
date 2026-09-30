@@ -9,10 +9,10 @@
   "scripts": {
     "build": "next build",
     "dev": "next dev",
-    "start": "next start",
     "types:check": "next typegen && tsc --noEmit",
     "lint": "eslint",
-    "check": "npm run lint && npm run types:check && npm run build"
+    "check:export": "node scripts/check-static-export.mjs",
+    "check": "npm run lint && npm run types:check && npm run build && npm run check:export"
   },
   "dependencies": {
     "cn": "^0.3.0",

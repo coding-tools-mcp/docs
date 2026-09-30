@@ -1,9 +1,8 @@
 name: CI
 
 on:
-  push:
-    branches: [main]
   pull_request:
+  workflow_dispatch:
 
 permissions:
   contents: read
@@ -11,6 +10,9 @@ permissions:
 jobs:
   docs:
     runs-on: ubuntu-latest
+    env:
+      NEXT_PUBLIC_BASE_PATH: /docs
+      NEXT_PUBLIC_SITE_URL: https://example.test/docs
     steps:
       - uses: actions/checkout@v6
       - uses: actions/setup-node@v6

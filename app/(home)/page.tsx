@@ -37,7 +37,7 @@ export default function HomePage() {
           </p>
           <div className="mt-8 flex flex-wrap gap-3">
             <Link
-              href="/docs/getting-started"
+              href="/getting-started"
               className="inline-flex items-center gap-2 rounded-lg bg-fd-primary px-4 py-2.5 text-sm font-medium text-fd-primary-foreground"
             >
               Get started <ArrowRight className="size-4" />

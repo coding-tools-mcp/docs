@@ -187,7 +187,7 @@ arguments — reports the versions this server speaks, its capabilities, and the
 workspace instructions, which is what `initialize` would have told you. Results
 in this era carry `resultType`, an `_meta` server identity, and cache hints;
 over HTTP each request also mirrors its version and method in headers (see
-[remote access](/docs/guides/remote-access)). Drop the `_meta` and the same request is a
+[remote access](/guides/remote-access)). Drop the `_meta` and the same request is a
 handshake-era one again — the two eras are decided per request, not per
 connection.
 
@@ -200,7 +200,7 @@ changes:
 | --- | --- | --- |
 | Local stdio (default) | `uvx coding-tools-mcp --stdio --workspace <repo>` | close stdin, then terminate |
 | Docker stdio | `docker run --rm -i -v "$PWD:/workspace" <image> --stdio` | close stdin — the server exits on EOF and `--rm` removes the container |
-| Docker HTTP | `docker run --rm --init -p 8765:8765 <image>` (see [Docker sandbox](/docs/guides/docker-sandbox)) | `docker stop` — the server handles SIGTERM and exits promptly |
+| Docker HTTP | `docker run --rm --init -p 8765:8765 <image>` (see [Docker sandbox](/guides/docker-sandbox)) | `docker stop` — the server handles SIGTERM and exits promptly |
 | Remote HTTP | POST JSON-RPC to `http://host:8765/mcp` with `Authorization: Bearer <token>` | server lifetime is managed by whoever started it |
 
 ## Cleanup Checklist

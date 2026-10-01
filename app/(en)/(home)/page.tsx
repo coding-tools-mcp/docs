@@ -1,5 +1,5 @@
 import Link from 'next/link';
-import { ArrowRight, GitBranch, Monitor, ShieldCheck, TerminalSquare } from 'lucide-react';
+import { ArrowRight, GitBranch, GitFork, Monitor, ShieldCheck, TerminalSquare } from 'lucide-react';
 import { coreRepositoryUrl, desktopRepositoryUrl, withBasePath } from '@/lib/shared';
 
 const features = [
@@ -71,6 +71,25 @@ export default function HomePage() {
               <p className="mt-2 text-sm leading-6 text-fd-muted-foreground">{description}</p>
             </div>
           ))}
+        </div>
+
+        <div className="mt-6 flex flex-col gap-5 rounded-2xl border border-dashed bg-fd-card/40 p-6 sm:flex-row sm:items-center sm:justify-between">
+          <div className="max-w-2xl">
+            <div className="flex items-center gap-2 text-sm font-medium">
+              <GitFork className="size-4" />
+              Ecosystem & community
+            </div>
+            <p className="mt-2 text-sm leading-6 text-fd-muted-foreground">
+              Explore official companion projects and community-maintained downstreams built on Coding Tools MCP,
+              with clear support and compatibility boundaries.
+            </p>
+          </div>
+          <Link
+            href="/ecosystem"
+            className="inline-flex shrink-0 items-center gap-2 text-sm font-medium"
+          >
+            Explore the ecosystem <ArrowRight className="size-4" />
+          </Link>
         </div>
       </section>
     </main>

@@ -1,0 +1,77 @@
+---
+title: 生态与社区项目
+description: Coding Tools MCP 官方项目，以及由社区维护的下游版本、集成和实验项目。
+---
+
+Coding Tools MCP 有意保持为一个较小、与模型无关的编码 runtime。这样其他项目就可以在它之上继续构建：桌面端、个人工作站发行版、不同的传输方式、Agent 集成和专用工作流，都不必全部塞进 upstream 仓库。
+
+这一页会明确区分 **官方项目** 与 **社区维护项目**，避免用户把第三方 downstream 误认为 Coding Tools MCP 官方支持的组件。
+
+## 官方项目
+
+以下项目由 Coding Tools MCP 项目直接维护：
+
+- **[Coding Tools MCP Core](https://github.com/xyTom/coding-tools-mcp)** — 权威 runtime、协议行为、PyPI package、npm launcher、schema、测试和 release contract。
+- **[Coding Tools MCP Desktop](https://github.com/coding-tools-mcp/desktop)** — 官方桌面应用，用于配置和运行 Coding Tools MCP。
+- **[Documentation](https://github.com/coding-tools-mcp/docs)** — 当前文档站的源码。
+
+## 社区项目
+
+> **由社区维护。** 以下项目不由 Coding Tools MCP 官方维护，也没有经过官方的安全审查或 release 测试。它们的行为、兼容性和安全边界可能与 upstream 不同。收录在这里仅用于信息展示，不代表官方背书。
+
+### Downstream Runtime 与 Workbench
+
+#### Coding Tools MCP Workbench
+
+**[biaobiao2233/coding-tools-mcp-workbench](https://github.com/biaobiao2233/coding-tools-mcp-workbench)**
+
+面向可信个人开发机的 downstream workbench。该项目明确保留 upstream 的 Apache-2.0 血缘和归属声明，并在此基础上扩展了大量 Windows、并发/资源租约、受审查的 host access、项目连续性以及本地 Agent Transport 能力。
+
+它的目标是提供一个比 upstream 更偏“个人工作站产品”的 runtime，而 upstream 则保持更小、更中立的核心边界。
+
+#### Coding Tools MCP — Desktop / Node downstream
+
+**[shelizi/coding-tools-mcp](https://github.com/shelizi/coding-tools-mcp)**
+
+一个已经演进成较完整工作站产品的社区 downstream：包含 Rust + Tauri 桌面端、portable Node Agent、共享的 Svelte 管理界面、持久 Workspace、Skills / Hooks / 外部 MCP 管理、Windows Computer Use，以及多种 tunnel 方案。
+
+它与 upstream 相比集成度更高，因此更适合把它视为一个独立发行版，而不是默认认为它与 upstream 的 runtime contract 或 release cadence 完全一致。
+
+## 基于 Coding Tools MCP 构建
+
+如果你想基于 Coding Tools MCP 做自己的项目，并不一定需要 fork 整个仓库。常见形式包括：
+
+- MCP 桌面端或终端 UI；
+- 把 Coding Tools MCP 当执行层的专用 Agent workflow；
+- 不同的 transport、tunnel 或部署 wrapper；
+- 针对特定操作系统的平台发行版；
+- 面向某个编辑器、模型 host 或开发流程的集成；
+- 明确选择不同产品边界的 downstream runtime。
+
+如果只是把 runtime 当依赖，优先使用已经发布的 package 或 MCP endpoint，并让你的项目独立版本化。只有在你确实需要修改 runtime 行为时，才更适合 fork。
+
+## 提交你的项目
+
+欢迎社区项目加入这一页。
+
+向 **[coding-tools-mcp/docs](https://github.com/coding-tools-mcp/docs)** 提交 Pull Request，并在本页增加项目条目。请至少提供：
+
+1. 项目名称和公开源码地址；
+2. 一到两句话说明它增加或改变了什么；
+3. 它属于 integration、wrapper、distribution 还是 downstream runtime；
+4. 清楚说明它与 Coding Tools MCP 的关系；
+5. 如果包含衍生代码，请遵守 upstream Apache-2.0 与 NOTICE 所要求的 license 和 attribution。
+
+项目描述应尽量客观，不应让用户误以为第三方项目受到官方支持。
+
+## 兼容性说明
+
+Upstream 的权威行为仍以 [runtime contract](https://github.com/xyTom/coding-tools-mcp/blob/main/docs/runtime-contract-v0.3.md)、[tool schemas](https://github.com/xyTom/coding-tools-mcp/blob/main/docs/tools-and-schemas.md) 和当前 release notes 为准。
+
+社区项目可能有意做出不同选择。切换到 downstream 前，建议检查其自身文档中的：
+
+- 支持的 MCP 协议版本；
+- tool catalog 和 schema 差异；
+- workspace 与命令执行安全边界；
+- authentication 与公网暴露方式；
+- release cadence 和 upstream merge 策略。

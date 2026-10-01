@@ -12,9 +12,20 @@ Coding Tools MCP 是一个通过 Model Context Protocol 提供能力、与具体
 - [远程访问](/zh-CN/guides/remote-access) — 通过带认证的 HTTPS 隧道安全暴露本地 runtime。
 - [Docker 沙箱](/zh-CN/guides/docker-sandbox) — 在一次性容器中运行不可信工作负载。
 - [故障排查](/zh-CN/troubleshooting) — 排查协议、传输和 runtime 问题。
+- [生态与社区项目](/zh-CN/ecosystem) — 查看官方配套项目，以及基于 Coding Tools MCP 构建的社区 downstream 和集成。
+
+## 给 AI Agent 使用
+
+文档站同时发布适合机器直接读取的 Markdown：
+
+- [`llms.txt`](/zh-CN/llms.txt) — 精简的文档索引。
+- [`llms-full.txt`](/zh-CN/llms-full.txt) — 将完整中文文档合并成一个文本入口。
+- 每个文档页顶部的 **Copy Markdown / View options** 都可以直接获取当前页面的 Markdown。
+
+当 Agent 需要读取项目文档时，优先使用这些入口，而不是解析渲染后的网页。
 
 ## 项目仓库
 
 核心 runtime 仍位于 [xyTom/coding-tools-mcp](https://github.com/xyTom/coding-tools-mcp)。Desktop 应用独立维护在 [coding-tools-mcp/desktop](https://github.com/coding-tools-mcp/desktop)。
 
-与源码强耦合的 runtime contract、schema、安全边界和测试证据继续以核心仓库为准。权威入口见 [参考资料](/zh-CN/reference)。
+与源码强耦合的 runtime contract、schema、安全边界和测试证据继续以核心仓库为准。权威入口见 [参考资料](/zh-CN/reference)。社区扩展和 downstream 统一放在 [生态与社区项目](/zh-CN/ecosystem)，并明确区分官方组件和第三方项目。

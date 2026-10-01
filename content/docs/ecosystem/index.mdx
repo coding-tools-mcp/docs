@@ -1,0 +1,77 @@
+---
+title: Ecosystem & community projects
+description: Official Coding Tools MCP projects and community-maintained downstreams, integrations, and experiments.
+---
+
+Coding Tools MCP is intentionally a small, model-neutral runtime. That makes it useful as a base for other projects: desktop shells, personal-workstation distributions, alternate transports, agent integrations, and specialized workflows can build on the same core ideas without needing to live in the upstream repository.
+
+This page separates **official projects** from **community-maintained projects** so it is clear what the Coding Tools MCP maintainers support directly.
+
+## Official projects
+
+These projects are maintained under the Coding Tools MCP project:
+
+- **[Coding Tools MCP Core](https://github.com/xyTom/coding-tools-mcp)** — the canonical runtime, protocol behavior, PyPI package, npm launcher, schemas, tests, and release contract.
+- **[Coding Tools MCP Desktop](https://github.com/coding-tools-mcp/desktop)** — the official desktop application for configuring and running Coding Tools MCP.
+- **[Documentation](https://github.com/coding-tools-mcp/docs)** — the source for this documentation site.
+
+## Community projects
+
+> **Community-maintained.** The projects below are not officially supported, security-reviewed, or release-tested by the Coding Tools MCP maintainers. Their behavior, compatibility, and security model may differ from upstream. A listing here is informational, not an endorsement.
+
+### Downstream runtimes & workbenches
+
+#### Coding Tools MCP Workbench
+
+**[biaobiao2233/coding-tools-mcp-workbench](https://github.com/biaobiao2233/coding-tools-mcp-workbench)**
+
+A downstream workbench focused on trusted personal workstations. It explicitly preserves the upstream Apache-2.0 lineage while extending the runtime with substantial Windows, concurrency/resource-leasing, reviewed host access, project-continuity, and local Agent Transport work.
+
+It targets a more opinionated personal-workstation runtime than the upstream project's smaller, model-neutral core boundary.
+
+#### Coding Tools MCP — Desktop / Node downstream
+
+**[shelizi/coding-tools-mcp](https://github.com/shelizi/coding-tools-mcp)**
+
+A community downstream that has evolved into a larger workstation product with a Rust + Tauri desktop client, a portable Node Agent, a shared Svelte management UI, persistent workspaces, skills/hooks/external-MCP management, Windows Computer Use, and multiple tunnel options.
+
+It is substantially more integrated than upstream and should be evaluated as its own distribution rather than assumed to match the upstream runtime contract or release cadence.
+
+## Building on Coding Tools MCP
+
+If you are building something on top of Coding Tools MCP, you do **not** need to fork the whole project. Common patterns include:
+
+- an MCP-aware desktop or terminal UI;
+- a specialized agent workflow that uses Coding Tools MCP as its execution layer;
+- an alternate transport, tunnel, or deployment wrapper;
+- a platform-specific distribution;
+- an integration for a particular editor, model host, or developer workflow;
+- a downstream runtime with deliberately different product boundaries.
+
+For integrations that only need the runtime as a dependency, prefer using the published package or MCP endpoint and keep your project independently versioned. Fork when you intentionally need to change runtime behavior.
+
+## Add your project
+
+Community projects are welcome.
+
+Open a pull request against **[coding-tools-mcp/docs](https://github.com/coding-tools-mcp/docs)** and add your project to this page. Please include:
+
+1. the project name and public source URL;
+2. a one- or two-sentence description of what it adds or changes;
+3. whether it is an integration, wrapper, distribution, or downstream runtime;
+4. a clear statement of its relationship to Coding Tools MCP;
+5. for derivative code, the appropriate license and attribution required by the upstream Apache-2.0 license and NOTICE.
+
+Listings should describe what a project actually does and avoid implying official support.
+
+## Compatibility expectations
+
+The authoritative upstream behavior remains the [runtime contract](https://github.com/xyTom/coding-tools-mcp/blob/main/docs/runtime-contract-v0.3.md), [tool schemas](https://github.com/xyTom/coding-tools-mcp/blob/main/docs/tools-and-schemas.md), and current upstream release notes.
+
+Community projects may intentionally diverge. Before switching to a downstream project, check its own documentation for:
+
+- supported MCP protocol versions;
+- tool catalog and schema differences;
+- workspace and command-security boundaries;
+- authentication and public-network behavior;
+- release cadence and upstream merge policy.

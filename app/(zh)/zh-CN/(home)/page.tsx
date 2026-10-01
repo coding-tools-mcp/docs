@@ -1,5 +1,5 @@
 import Link from 'next/link';
-import { ArrowRight, GitBranch, Monitor, ShieldCheck, TerminalSquare } from 'lucide-react';
+import { ArrowRight, GitBranch, GitFork, Monitor, ShieldCheck, TerminalSquare } from 'lucide-react';
 import { coreRepositoryUrl, desktopRepositoryUrl, withBasePath } from '@/lib/shared';
 
 const features = [
@@ -71,6 +71,25 @@ export default function HomePage() {
               <p className="mt-2 text-sm leading-6 text-fd-muted-foreground">{description}</p>
             </div>
           ))}
+        </div>
+
+        <div className="mt-6 flex flex-col gap-5 rounded-2xl border border-dashed bg-fd-card/40 p-6 sm:flex-row sm:items-center sm:justify-between">
+          <div className="max-w-2xl">
+            <div className="flex items-center gap-2 text-sm font-medium">
+              <GitFork className="size-4" />
+              生态与社区
+            </div>
+            <p className="mt-2 text-sm leading-6 text-fd-muted-foreground">
+              查看官方配套项目，以及社区基于 Coding Tools MCP 构建的 downstream、发行版和集成，
+              并明确区分支持范围与兼容性边界。
+            </p>
+          </div>
+          <Link
+            href="/zh-CN/ecosystem"
+            className="inline-flex shrink-0 items-center gap-2 text-sm font-medium"
+          >
+            查看生态项目 <ArrowRight className="size-4" />
+          </Link>
         </div>
       </section>
     </main>

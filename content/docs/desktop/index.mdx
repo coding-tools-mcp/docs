@@ -73,8 +73,27 @@ The **Dashboard** shows CPU, memory, uptime, and the Core version, plus independ
 
 ## Connect a client
 
-Copy the endpoint or the client configuration from the Dashboard or Connections page and paste it into your MCP client. Per-client details are in [Client configuration](/clients). ChatGPT accepts a custom MCP server through Plugins → Add → Custom MCP server: paste a Token in URL endpoint and choose **No authentication**, or point a **Stable public access** workspace at an OAuth flow. Any MCP client that accepts a URL works with Token in URL; here MCP Inspector lists the workspace directory through the tunnel:
+Copy the endpoint or the client configuration from the Dashboard or Connections page and paste it into your MCP client. Per-client details are in [Client configuration](/clients). Any MCP client that accepts a URL works with Token in URL; here MCP Inspector lists the workspace directory through the tunnel:
 
 ![MCP Inspector connected to the workspace, listing directory entries](/images/desktop/inspector-list-dir.png)
+
+### ChatGPT
+
+ChatGPT accepts a custom MCP server from its Plugins page — this works on the free tier. You need a public workspace endpoint; **Token in URL** authentication is the simplest fit because ChatGPT's custom-server dialog cannot set request headers.
+
+1. In the desktop app, start a workspace on **Temporary sharing** or **Stable public access** with **Token in URL** authentication, then click **Copy endpoint** on the Dashboard or Connections page. The copied URL already contains `?token=`.
+2. In ChatGPT, open the **Plugins** page, click **Add**, then **Add custom MCP server**.
+
+   ![The Add menu on the ChatGPT Plugins page](/images/desktop/chatgpt-add-menu.png)
+
+3. Give the server a name, paste the endpoint into **Server URL**, set **Authentication** to **No authentication** — the token travels inside the URL — tick **I understand and want to continue**, and click **Create as a plugin**.
+
+   ![The filled Add custom MCP server dialog](/images/desktop/chatgpt-dialog-filled.png)
+
+4. When the connect card appears, click **Connect**. ChatGPT then lists the plugin under **Installed** and calls its tools from chat.
+
+   ![ChatGPT answering via the Coding Tools MCP plugin](/images/desktop/chatgpt-call-result.png)
+
+The `?token=` parameter is what authorizes ChatGPT — treat that URL as a secret and rotate it if it leaks. A workspace on **Stable public access** can instead use the OAuth flow for browser sign-in.
 
 For tunnel and network background, see [Remote access](/guides/remote-access).

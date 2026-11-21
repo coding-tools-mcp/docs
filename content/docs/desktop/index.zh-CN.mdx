@@ -73,8 +73,27 @@ Coding Tools MCP Desktop 是 macOS、Windows 和 Linux 的原生应用。它把�
 
 ## 连接客户端
 
-从 Dashboard 或 Connections 页复制端点或客户端配置，粘贴到 MCP 客户端中。各客户端的详细说明见[客户端配置](/zh-CN/clients)。ChatGPT 通过 Plugins → Add → Custom MCP server 接受自定义 MCP 服务器：粘贴 Token in URL 端点并选择 **No authentication**，或让 **Stable public access** 的工作区走 OAuth 流程。凡是只接受 URL 的 MCP 客户端都可以用 Token in URL；下图中 MCP Inspector 通过隧道列出了工作区目录：
+从 Dashboard 或 Connections 页复制端点或客户端配置，粘贴到 MCP 客户端中。各客户端的详细说明见[客户端配置](/zh-CN/clients)。凡是只接受 URL 的 MCP 客户端都可以用 Token in URL；下图中 MCP Inspector 通过隧道列出了工作区目录：
 
 ![MCP Inspector 连接工作区后列出目录内容](/images/desktop/inspector-list-dir.png)
+
+### ChatGPT
+
+ChatGPT 可以在 Plugins 页面接受自定义 MCP 服务器——免费版即可使用。需要一个公网工作区端点；**Token in URL** 认证最省事，因为 ChatGPT 的自定义服务器对话框无法设置请求头。
+
+1. 在桌面应用里，用 **Temporary sharing** 或 **Stable public access** 加 **Token in URL** 认证启动一个工作区，然后在 Dashboard 或 Connections 页点 **Copy endpoint**。复制到的 URL 已经包含 `?token=`。
+2. 在 ChatGPT 打开 **Plugins** 页，点 **Add**，再选 **Add custom MCP server**。
+
+   ![ChatGPT Plugins 页的 Add 菜单](/images/desktop/chatgpt-add-menu.png)
+
+3. 给服务器起个名字，把端点粘到 **Server URL**，**Authentication** 选 **No authentication**——令牌已经带在 URL 里——勾选 **I understand and want to continue**，点 **Create as a plugin**。
+
+   ![填写完成的 Add custom MCP server 对话框](/images/desktop/chatgpt-dialog-filled.png)
+
+4. 弹出连接卡片时点 **Connect**。之后插件出现在 **Installed** 列表里，ChatGPT 就能在对话中调用它的工具了。
+
+   ![ChatGPT 通过 Coding Tools MCP 插件返回结果](/images/desktop/chatgpt-call-result.png)
+
+`?token=` 参数就是授权 ChatGPT 的凭据——把这个 URL 当作密钥保管，泄露后要换新的。**Stable public access** 的工作区也可以改用 OAuth 走浏览器登录。
 
 隧道和网络背景见[远程访问](/zh-CN/guides/remote-access)。

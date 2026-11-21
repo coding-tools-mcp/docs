@@ -15,3 +15,13 @@ This repository owns the public Coding Tools MCP website and human-oriented docu
 - Only list community projects that have a public, verifiable source. Describe them from their own public documentation, avoid implying endorsement, and keep the non-official support/security disclaimer intact.
 - When adding a derivative project, verify that its public repository clearly describes its relationship to Coding Tools MCP and preserves the relevant upstream license/attribution obligations.
 - Run `npm run check` for site changes when Node.js dependencies are available. The static export gate enforces bilingual content parity, GitHub Pages links, locale-specific search, metadata, and LLM outputs.
+
+<!-- BEGIN:nextjs-agent-rules -->
+
+# This is NOT the Next.js you know
+
+This version has breaking changes — APIs, conventions, and file structure may all differ from your training data. Read the relevant guide in `node_modules/next/dist/docs/` (resolved from this file's directory; in monorepos the `next` package may not be visible from the repo root) before writing any code. Heed deprecation notices.
+
+This block is written and re-added by `next dev` — verify at `node_modules/next/dist/server/lib/generate-agent-files.js`. Removing it from a diff only re-creates the uncommitted change; committing it with your work keeps the tree clean.
+
+<!-- END:nextjs-agent-rules -->

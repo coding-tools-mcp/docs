@@ -3,6 +3,7 @@
   "pages": [
     "index",
     "getting-started",
+    "desktop",
     "clients",
     "guides",
     "troubleshooting",

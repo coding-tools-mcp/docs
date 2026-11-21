@@ -1,0 +1,80 @@
+---
+title: Desktop app
+description: Run and share Coding Tools MCP workspaces from the native desktop application, without using a terminal.
+---
+
+Coding Tools MCP Desktop is a native app for macOS, Windows, and Linux. It wraps the official `coding-tools-mcp` core in a graphical shell: you create workspaces, pick a runtime, start and stop the server, and optionally expose it through a tunnel — all without editing config files. The source and native bundles live in [coding-tools-mcp/desktop](https://github.com/coding-tools-mcp/desktop).
+
+![The dashboard with a running workspace](/images/desktop/dashboard-running.png)
+
+## Install
+
+1. Install a native bundle from the [desktop repository](https://github.com/coding-tools-mcp/desktop), or build one following its README.
+2. Open **Settings** and choose **Install recommended Core**. The bundled installer downloads a private Python and the selected official Core, so you do not need Python or uv installed yourself. **Use existing Core** in the workspace wizard skips that download.
+3. Install [cloudflared](https://developers.cloudflare.com/cloudflare-one/networks/connectors/cloudflare-tunnel/downloads/) only if you plan to share a workspace publicly. Local-only workspaces need nothing else.
+
+![Settings: language, appearance, close to tray, and managed Core installation](/images/desktop/settings.png)
+
+## Create a workspace
+
+Click **New workspace** in the sidebar. The wizard has three steps:
+
+1. **Choose folder** — a workspace name and the absolute folder path your tools may access.
+2. **Access** — how clients reach the workspace (see below).
+3. **Review workspace** — confirm and create.
+
+![The New workspace wizard, folder step](/images/desktop/new-workspace.png)
+
+The **Permission mode** toggle at the bottom chooses between `Safe` (the default, stricter execution checks — it is not read-only) and `Trusted`, which is an explicit opt-in for code you trust.
+
+### Access modes
+
+| Access | Public address | Best for |
+| --- | --- | --- |
+| **Only this device** | None — loopback only | Local clients such as Claude Desktop, Cursor, or MCP Inspector |
+| **Temporary sharing** | A Quick Tunnel `*.trycloudflare.com` URL that changes on every restart | Short-lived sharing and demos |
+| **Stable public access** | Your own domain through a named Cloudflare tunnel | A permanent URL and browser sign-in |
+| **FRP / existing HTTPS proxy** | An externally managed route | When you run your own proxy |
+
+Both Cloudflare options need `cloudflared`. The named-tunnel path can open your browser for Cloudflare authorization and create the tunnel and DNS route for you after confirmation. A failed tunnel leaves the local service running.
+
+![The Access step of the wizard with Temporary sharing selected](/images/desktop/workspace-access.png)
+
+## Authentication
+
+Public access always requires one authentication method. Leave credential fields empty and the app generates them on save.
+
+| Method | What the client sends | Use it when |
+| --- | --- | --- |
+| **Bearer token** (default) | `Authorization: Bearer <token>` | The client can set request headers |
+| **Token in URL** | `?token=<token>` inside the URL | The client only accepts a URL, for example a ChatGPT connector or a simple embed — the same token also works as a Bearer header |
+| **Username and password** | HTTP Basic auth | The client offers a username/password sign-in |
+| **Browser sign-in (OAuth)** | An OAuth flow with the workspace password | Only with a stable address (named tunnel or FRP) |
+
+![Authentication options: Bearer token, Token in URL, Username and password](/images/desktop/authentication-options.png)
+
+**Copy endpoint** gives you the ready-to-use URL — for Token in URL it already contains `?token=`. **Copy config** on the Connections page produces the matching client entry, and **Show credentials** reveals the saved values. The `?token=` value is stripped before requests reach the core, so it never lands in core logs. `/.well-known/` discovery stays public in every mode.
+
+## Run and monitor
+
+The **Dashboard** shows CPU, memory, uptime, and the Core version, plus independent health cards for the **Local service** and **Public access**. Start, stop, and restart the workspace from here.
+
+- **Connections** — both endpoints with copy buttons, **Check public address**, tunnel notices, and the named-tunnel section.
+
+  ![The Connections page](/images/desktop/connections.png)
+
+- **Activity** — recent tool calls with outcome filters. The published Core 0.5.0 does not expose an event journal, so *Tool history unavailable* is expected there; tools still run normally.
+
+- **Diagnostics** — **Run checks** for runtime, folder access, and connectivity; **Export diagnostics** writes a redacted report; the runtime and tunnel logs appear with credentials redacted.
+
+  ![The Diagnostics page with redacted runtime logs](/images/desktop/diagnostics.png)
+
+- **Settings** — language (English / 简体中文), light or dark appearance, **Close to tray** to keep services running when the window closes, and managed Core installs with rollback.
+
+## Connect a client
+
+Copy the endpoint or the client configuration from the Dashboard or Connections page and paste it into your MCP client. Per-client details are in [Client configuration](/clients). ChatGPT accepts a custom MCP server through Plugins → Add → Custom MCP server: paste a Token in URL endpoint and choose **No authentication**, or point a **Stable public access** workspace at an OAuth flow. Any MCP client that accepts a URL works with Token in URL; here MCP Inspector lists the workspace directory through the tunnel:
+
+![MCP Inspector connected to the workspace, listing directory entries](/images/desktop/inspector-list-dir.png)
+
+For tunnel and network background, see [Remote access](/guides/remote-access).

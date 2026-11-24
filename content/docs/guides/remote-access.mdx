@@ -39,7 +39,7 @@ The scripts also support `ngrok` and `devtunnel`.
 
 ### Stable Cloudflare tunnel
 
-The install-script commands above start temporary Cloudflare Quick Tunnels. They do not read a named tunnel's `TUNNEL_TOKEN`, `TUNNEL_TOKEN_FILE`, or local Cloudflare configuration. Use a Quick Tunnel for short-lived sharing; use a named tunnel or another stable reverse proxy for a permanent client configuration.
+The install-script commands above are intended to start temporary Cloudflare Quick Tunnels. Only use that quick path on a machine whose `cloudflared` configuration you control: existing local ingress rules can take precedence over the `--url` loopback target and publish the wrong service. When in doubt, use a named tunnel or another reverse proxy you explicitly configure.
 
 For a stable Cloudflare hostname, create a remotely managed named tunnel in Cloudflare and configure its public hostname to route to `http://127.0.0.1:8765` (or your chosen port). From a source checkout, set exactly one Cloudflare credential variable and start the tunnel integration:
 

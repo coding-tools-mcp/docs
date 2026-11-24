@@ -34,7 +34,7 @@ CODING_TOOLS_MCP_AUTH_MODE=bearer integrations/tunnels/tunnel.sh cloudflared /pa
 
 ### 稳定的 Cloudflare 隧道
 
-上面的 install-script 命令启动的是临时 Cloudflare Quick Tunnel。它们不会读取命名隧道的 `TUNNEL_TOKEN`、`TUNNEL_TOKEN_FILE` 或本地 Cloudflare 配置。短期分享可以使用 Quick Tunnel；长期固定的客户端配置应使用命名隧道或其他稳定的反向代理。
+上面的 install-script 命令预期启动临时 Cloudflare Quick Tunnel。只有在你确认本机 `cloudflared` 配置可控时才应使用这条快速路径：已有本地 ingress 规则可能优先于 `--url` 的 loopback 目标，从而把错误的服务发布到公网。不确定时，使用命名隧道或其他你显式配置的反向代理。
 
 要使用稳定的 Cloudflare hostname，先在 Cloudflare 中创建 remotely managed named tunnel，并把它的 public hostname 路由到 `http://127.0.0.1:8765`（或你选择的端口）。从源码 checkout 中设置且只设置一个 Cloudflare 凭据变量，然后启动 tunnel integration：
 

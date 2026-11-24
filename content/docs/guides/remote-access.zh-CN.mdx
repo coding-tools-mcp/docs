@@ -28,6 +28,20 @@ CODING_TOOLS_MCP_AUTH_MODE=bearer integrations/tunnels/tunnel.sh cloudflared /pa
 
 脚本同样支持 `ngrok` 和 `devtunnel`。
 
+### 稳定的 Cloudflare 隧道
+
+上面的 install-script 命令启动的是临时 Cloudflare Quick Tunnel。它们不会读取命名隧道的 `TUNNEL_TOKEN`、`TUNNEL_TOKEN_FILE` 或本地 Cloudflare 配置。短期分享可以使用 Quick Tunnel；长期固定的客户端配置应使用命名隧道或其他稳定的反向代理。
+
+要使用稳定的 Cloudflare hostname，先在 Cloudflare 中创建 remotely managed named tunnel，并把它的 public hostname 路由到 `http://127.0.0.1:8765`（或你选择的端口）。从源码 checkout 中设置且只设置一个 Cloudflare 凭据变量，然后启动 tunnel integration：
+
+```bash
+export TUNNEL_TOKEN_FILE=/path/to/private/cloudflare-tunnel-token.txt
+export CODING_TOOLS_MCP_SERVER_URL=https://mcp.example.com
+CODING_TOOLS_MCP_AUTH_MODE=oauth integrations/tunnels/tunnel.sh cloudflared /path/to/repo
+```
+
+也可以用 `TUNNEL_TOKEN` 代替 `TUNNEL_TOKEN_FILE`。不要把 token 放进仓库、shell history 或命令行参数。把 `CODING_TOOLS_MCP_SERVER_URL` 设置为不包含 `/mcp` 的公网 HTTPS origin，这样 OAuth discovery 和 token audience 都会使用稳定 hostname。命名隧道只能固定 hostname；server 重启后，进程内的 OAuth dynamic client registration 仍然会重置。
+
 ## OAuth 2.1 + dynamic registration
 
 对于不能设置静态 `Authorization` header、但支持 MCP OAuth discovery 的客户端：

@@ -9,11 +9,15 @@ and publish it through an HTTPS tunnel. The fixed tool set includes
 public deployment must use bearer auth, OAuth, or an external authenticated
 proxy.
 
+Before using `--auto-install-tunnel` on macOS, install `cloudflared` manually unless Homebrew is already available; the script's direct-download fallback does not handle Cloudflare's macOS `.tgz` package.
+
+Install [`uv`](https://docs.astral.sh/uv/getting-started/installation/) first when possible. Without `uv`, the installer falls back to `pip install --user`; externally managed Python installations can reject that fallback before the tunnel starts.
+
 ## One-command bearer tunnel
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/xyTom/coding-tools-mcp/main/scripts/install.sh \
-  | bash -s -- --tunnel cloudflared --auto-install-tunnel --workspace /path/to/repo
+  | bash -s -- --tunnel cloudflared --auto-install-tunnel --auth-mode bearer --workspace /path/to/repo
 ```
 
 The script generates a bearer token, starts the server on `127.0.0.1`, and
@@ -33,14 +37,28 @@ CODING_TOOLS_MCP_AUTH_MODE=bearer integrations/tunnels/tunnel.sh cloudflared /pa
 
 The scripts also support `ngrok` and `devtunnel`.
 
+### Stable Cloudflare tunnel
+
+The install-script commands above are intended to start temporary Cloudflare Quick Tunnels. Only use that quick path on a machine whose `cloudflared` configuration you control: existing local ingress rules can take precedence over the `--url` loopback target and publish the wrong service. When in doubt, use a named tunnel or another reverse proxy you explicitly configure.
+
+For a stable Cloudflare hostname, create a remotely managed named tunnel in Cloudflare and configure its public hostname to route to `http://127.0.0.1:8765` (or your chosen port). From a source checkout, set exactly one Cloudflare credential variable and start the tunnel integration:
+
+```bash
+export TUNNEL_TOKEN_FILE=/path/to/private/cloudflare-tunnel-token.txt
+export CODING_TOOLS_MCP_SERVER_URL=https://mcp.example.com
+CODING_TOOLS_MCP_AUTH_MODE=oauth integrations/tunnels/tunnel.sh cloudflared /path/to/repo
+```
+
+`TUNNEL_TOKEN` is also supported instead of `TUNNEL_TOKEN_FILE`. Keep the token out of repositories, shell history, and command-line arguments. Set `CODING_TOOLS_MCP_SERVER_URL` to the public HTTPS origin without `/mcp` so OAuth discovery and token audiences use the stable host. Named tunnels preserve the hostname, but process-local OAuth dynamic client registrations still reset when the server restarts.
+
 ## OAuth 2.1 + dynamic registration
 
 For clients that cannot set a static `Authorization` header but support MCP
 OAuth discovery:
 
 ```bash
-CODING_TOOLS_MCP_AUTH_MODE=oauth \
-integrations/tunnels/tunnel.sh cloudflared /path/to/repo
+curl -fsSL https://raw.githubusercontent.com/xyTom/coding-tools-mcp/main/scripts/install.sh \
+  | bash -s -- --tunnel cloudflared --auto-install-tunnel --auth-mode oauth --workspace /path/to/repo
 ```
 
 The server implements Authorization Code + PKCE S256 and RFC 7591 dynamic

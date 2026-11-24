@@ -1,7 +1,162 @@
 ---
 title: 故障排查
-description: 排查协议、传输、沙箱和 runtime 问题。
+description: 按层排查客户端、transport、认证、协议、沙箱和 runtime 问题。
 ---
+
+不要把真实 token、完整 `Authorization` header、`.env` 文件、私钥或未审查的 trace 粘贴到 issue、聊天、截图或日志里。分享诊断信息前请先脱敏。
+
+## 先定位失败层
+
+大多数“Coding Tools MCP 不能用”的报告，实际上属于六类不同故障之一。根据第一个可观察信号选择下一步，不要直接重启所有东西。
+
+| 信号 | 可能层级 | 下一步 |
+| --- | --- | --- |
+| 客户端始终不显示 server 或 tools | 客户端配置或进程启动 | 重启客户端；确认命令/路径完全正确；确认客户端支持 MCP |
+| 找不到 `uvx`、`npx` 或 `coding-tools-mcp` | 本地工具链或 GUI `PATH` | 在终端运行命令；在客户端中改用绝对可执行文件路径 |
+| 本地 HTTP URL 拒绝连接 | server 未运行或端口错误 | 启动 server，并在同一台机器检查 `http://127.0.0.1:8765/mcp` |
+| 隧道 URL 无响应或响应了错误站点 | 公网 / 隧道 / 反向代理 | 先检查隧道状态和 public discovery，不要急着改 workspace 设置 |
+| HTTP 401/403 或 OAuth 授权失败 | 认证 | 确认认证方式、token/password、精确 URL 和客户端能力 |
+| MCP 有响应，但文件/命令调用失败 | workspace 或 permission/runtime policy | 查看具体 tool error、permission mode、workspace path 和 exec diagnostics |
+
+云客户端失败不一定是 workspace 权限失败。如果请求根本没到达 server，修改 permission mode 无法修复。
+
+## 五分钟隔离检查
+
+### 1. runtime 能启动吗？
+
+```bash
+uvx coding-tools-mcp --help
+# 或
+npx --yes coding-tools-mcp --help
+```
+
+如果两个都不行，先修复 Python/uv 或 Node.js。如果终端里可以、GUI 客户端不行，客户端很可能使用了不同的 `PATH`；请改用绝对可执行文件路径。
+
+### 2. 本地 HTTP 有响应吗？
+
+启动 server：
+
+```bash
+uvx coding-tools-mcp --workspace /path/to/repo --port 8765
+```
+
+然后在同一台机器确认 endpoint 存在：
+
+```bash
+curl -i http://127.0.0.1:8765/.well-known/mcp.json
+```
+
+这个 Streamable HTTP 实现不提供 SSE stream，因此 `GET /mcp` 返回 `405` 是预期行为。MCP 请求请使用 POST。
+
+### 3. 带认证的远程 endpoint 有响应吗？
+
+把 `BASE_URL` 替换成 HTTPS origin，不要带 `/mcp`：
+
+```bash
+curl -i "$BASE_URL/.well-known/mcp.json"
+```
+
+Bearer mode 下，未认证 MCP 请求应该失败，正确 token 应该能完成 initialization：
+
+```bash
+curl "$BASE_URL/mcp" \
+  -H "Authorization: Bearer $CODING_TOOLS_MCP_AUTH_TOKEN" \
+  -H "Accept: application/json, text/event-stream" \
+  -H "Content-Type: application/json" \
+  --data '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2025-11-25","capabilities":{},"clientInfo":{"name":"smoke","version":"1"}}}'
+```
+
+不要把真实 token 直接写进 shell history 或共享输出。请使用环境变量或 secret store。
+
+### 4. 客户端看的是正确工作区吗？
+
+询问：
+
+```text
+Inspect this repository and summarize its structure. Do not modify files or run commands yet.
+```
+
+中文示例：
+
+```text
+检查这个仓库并总结它的结构。暂时不要修改文件，也不要运行命令。
+```
+
+如果回答描述的是错误项目，立即停止。先修正配置的 workspace path，再测试写入或命令。
+
+### 5. 公网访问真的启用了认证吗？
+
+把 URL 交给云客户端之前，先测试未认证场景。公网 no-auth MCP endpoint 不安全，因为固定工具目录包含文件修改和命令执行能力。
+
+## 客户端找不到 server 或 tools
+
+按顺序检查：
+
+1. 你编辑的是客户端真正读取的配置文件。
+2. JSON/TOML 语法正确，server name 使用正确。
+3. `/path/to/repo` 是指向目标工作区的绝对路径。
+4. 客户端已完全重启或重新加载。
+5. `uvx`/`npx` 能在终端运行。
+6. 如果客户端从 GUI 启动，使用绝对可执行文件路径。
+
+Server name 通常不必固定为 `coding-tools`，但 Gemini CLI 中应避免下划线，因为它会根据 server name 派生 tool name，并在第一个下划线处分割。
+
+## GUI 客户端提示找不到 `uvx` 或 `npx`
+
+这通常不是 Coding Tools MCP 崩溃。桌面应用经常继承最小的系统 `PATH`，而不是交互 shell 的 `PATH`。
+
+使用绝对路径，例如：
+
+```json
+{
+  "command": "/opt/homebrew/bin/uvx",
+  "args": ["coding-tools-mcp", "--stdio", "--workspace", "/path/to/repo"]
+}
+```
+
+查找路径：
+
+```bash
+which uvx
+which npx
+```
+
+Windows 上使用 `.exe` 的完整路径，或使用与你的安装方式匹配的 launcher。
+
+## 本地 server 已启动但客户端连不上
+
+确认两端使用同一种 transport：
+
+- stdio 客户端启动 command；它不会连接 `http://127.0.0.1:8765/mcp`。
+- HTTP 客户端连接 URL；除非客户端文档明确说明，否则它不会替你启动 stdio command。
+- `GET /mcp` 返回 `405` 是预期行为；MCP JSON-RPC 请求使用 POST。
+- 当前实现没有 HTTP session。旧 server 留下的 `Mcp-Session-Id` 会被忽略，`DELETE /mcp` 返回 `405`，因为没有 session 可终止。
+
+## 隧道或公网 endpoint 失败
+
+分开检查：
+
+1. **本地服务：** runtime 机器上的 loopback HTTP 是否响应？
+2. **隧道进程：** cloudflared/ngrok/devtunnel/桌面应用 public access 是否运行？
+3. **公网路由：** HTTPS hostname 是否到达正确的本地服务？
+4. **认证：** 客户端是否在正确位置发送正确凭据？
+5. **MCP 客户端能力：** 客户端能设置 header、完成 OAuth，还是只能接受一个 URL？
+
+临时 Cloudflare Quick Tunnel 重启后 hostname 会改变。如果客户端在重启后突然失败，比较客户端配置的 hostname 和当前 hostname。需要固定 hostname 时，使用命名隧道或其他稳定反向代理。
+
+## 认证失败
+
+认证方式必须匹配客户端能力：
+
+| 方式 | 常见失败 |
+| --- | --- |
+| Bearer token | 客户端不能设置 `Authorization` header，或 token 缺失/有多余空白/内容错误 |
+| Token in URL | 只复制了一部分 URL；完整 URL 已轮换；secret 泄露进日志后被撤销 |
+| Basic auth | 客户端实际要求 OAuth，或用户名/密码填反 |
+| OAuth | redirect URI 不匹配、重启后进程内 registration 丢失、公网 origin 错误，或客户端不支持 MCP OAuth discovery |
+| 无认证 | 仅 loopback 安全；永远不要把 no-auth 当作公网修复办法 |
+
+不要把 Token-in-URL endpoint 粘贴到聊天里“测试”。完整 URL 本身就是凭据。
 
 ## 协议版本错误
 
@@ -31,29 +186,21 @@ description: 排查协议、传输、沙箱和 runtime 问题。
 
 在隔离 container / VM 中，如果你明确希望关闭 `exec_command` permission gate，使用 `--permission-mode dangerous`。
 
+不要只是因为客户端提示太频繁就使用 `dangerous`。客户端基于 annotation 的确认是客户端行为，修改 server permission mode 不能重写这种行为。
+
 ## 工具链环境变量缺失
 
-`exec_command` 默认只继承核心 shell environment。如果 MSVC、CUDA、oneAPI、Nix 等工具依赖 parent terminal 中的变量，可这样启动：
+`exec_command` 默认只继承核心 shell environment。如果 MSVC、CUDA、oneAPI、Nix、nvm、pyenv、rbenv 或 asdf 等工具依赖 parent terminal 中的变量，可这样启动：
 
 ```bash
 CODING_TOOLS_MCP_SHELL_ENV_INHERIT=all coding-tools-mcp --workspace /path/to/repo
 ```
 
-除非同时使用 `--permission-mode dangerous`，secret-looking 与 loader/startup 变量仍会被过滤。
+除非同时使用 `--permission-mode dangerous`，secret-looking 与 loader/startup 变量仍会被过滤。如果只是二进制版本错误，优先修正 server 启动时的 `PATH` 或使用工具链绝对路径，不要盲目扩大继承范围。见 [Exec command 故障排查](/zh-CN/troubleshooting/execution)。
 
 ## Exec diagnostics
 
-`exec_command` 可能返回 `diagnostics`，常见 code 包括：
-
-- `DEV_NULL_DENIED`
-- `DNS_RESOLUTION_FAILED`
-- `NETWORK_PERMISSION_REQUIRED`
-- `TMPDIR_NOT_WRITABLE`
-- `HOME_NOT_WRITABLE`
-- `COMMAND_TIMED_OUT`
-- `OUTPUT_TRUNCATED`
-
-详见 [Exec command 故障排查](/zh-CN/troubleshooting/execution)。
+`exec_command` 可能返回 `diagnostics`，常见 code 包括 `DEV_NULL_DENIED`、`DNS_RESOLUTION_FAILED`、`NETWORK_PERMISSION_REQUIRED`、`TMPDIR_NOT_WRITABLE`、`HOME_NOT_WRITABLE`、`COMMAND_TIMED_OUT` 和 `OUTPUT_TRUNCATED`。详见 [Exec command 故障排查](/zh-CN/troubleshooting/execution)。
 
 ## Trace tool call
 
@@ -63,7 +210,32 @@ CODING_TOOLS_MCP_SHELL_ENV_INHERIT=all coding-tools-mcp --workspace /path/to/rep
 CODING_TOOLS_MCP_TRACE=1 coding-tools-mcp --workspace /path/to/repo
 ```
 
-Trace event 以 JSON Lines 写入 stderr。Secret-looking key/value 会被脱敏；stdout 保留给 stdio JSON-RPC frame。
+Trace event 以 JSON Lines 写入 stderr。Secret-looking key/value 会被脱敏；stdout 保留给 stdio JSON-RPC frame。分享前仍需审查 trace，因为 tool payload 可能包含源码、命令或用户提供的 secret。
+
+## 桌面应用诊断
+
+桌面应用把 local service health、public access health、runtime logs、tunnel logs 和 diagnostics export 分开显示。先使用 **Diagnostics → Run checks**，再用 **Export diagnostics** 生成脱敏报告。
+
+理解桌面应用状态时注意：
+
+- **Local service ready** 不证明公网客户端已连接。
+- **Tunnel connected** 不证明认证成功或 MCP 调用成功。
+- 已发布 Core 0.5.0 不暴露事件日志，因此 **Tool history unavailable** 是预期；工具本身仍可能正常运行。
+- 隧道失败时本地服务可能仍在运行；阅读错误前不要删除或重建工作区。
+
+## 提交 bug 报告时应该包含什么
+
+只包含安全且相关的信息：
+
+- 精确错误文本和大致时间；
+- 客户端名称/版本和操作系统；
+- 使用的是 stdio、loopback HTTP、桌面应用 temporary sharing、stable public access，还是直接 tunnel；
+- 删除 secret 后的命令或配置结构；
+- loopback 是否可用；
+- 未认证公网请求是否如预期失败；
+- 脱敏后的相关诊断或 trace 行。
+
+永远不要包含 bearer token、完整 `?token=` URL、OAuth secret、私钥、`.env` 内容或未审查的命令输出。
 
 ## SWE-bench
 

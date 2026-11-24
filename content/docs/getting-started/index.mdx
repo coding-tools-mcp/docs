@@ -1,7 +1,133 @@
 ---
 title: Quickstart
-description: Install Coding Tools MCP and connect your first MCP client.
+description: Install Coding Tools MCP, connect one client, and verify the first safe end-to-end result.
 ---
+
+This page takes you from zero to one working setup in about ten minutes. It uses the safest default path: a local workspace, the `safe` permission mode, and a local MCP client.
+
+If you do not want to use a terminal at all, start with the [Desktop app](/desktop) instead. If your client is ChatGPT, Grok, or another cloud product that cannot start local processes, read [Choose your setup](/getting-started/choose-your-setup) before copying any configuration.
+
+## Before you begin
+
+You need:
+
+- a folder you are comfortable letting an AI inspect and modify — ideally a Git repository with a clean working tree;
+- Python 3.11 or newer with [uv](https://docs.astral.sh/uv/), or Node.js with `npx`;
+- an MCP client such as Claude Desktop, Claude Code, Codex, Cursor, VS Code, Windsurf, or Gemini CLI.
+
+<Callout type="warn" title="Start with a test repository">
+Coding Tools MCP is not a read-only viewer. Its default catalog can edit files and run commands inside the configured workspace. Try the first run on a small repository or a disposable copy, and keep secrets outside that folder.
+</Callout>
+
+## 1. Check that the runtime starts
+
+Python toolchain:
+
+```bash
+uvx coding-tools-mcp --help
+```
+
+Node.js toolchain:
+
+```bash
+npx --yes coding-tools-mcp --help
+```
+
+Either command downloads the published package if necessary and prints the command help. You do not need a persistent install for the first run.
+
+If both commands fail, install or repair uv/Python or Node.js first. If they print help but the client cannot launch the server later, use the absolute command path reported by `which uvx`, `which npx`, or your package manager.
+
+## 2. Choose the connection shape
+
+Most local desktop clients should use **stdio**: the client launches `coding-tools-mcp` as a child process. You do not manually start a server in that mode.
+
+| Your situation | Use | Workspace exposure |
+| --- | --- | --- |
+| Claude Desktop, Claude Code, Codex, Cursor, Windsurf, or Gemini CLI on the same computer | stdio | Only that client process |
+| MCP Inspector, VS Code HTTP mode, or a client that expects a URL on this computer | Streamable HTTP on loopback | `http://127.0.0.1:8765/mcp` |
+| ChatGPT, Grok, claude.ai, or a phone/browser outside this computer | authenticated HTTPS tunnel | Public URL; authentication is mandatory |
+| You want a GUI and no terminal | [Desktop app](/desktop) | Local-only or authenticated public access |
+| You are evaluating untrusted code | [Docker sandbox](/guides/docker-sandbox) | Disposable container |
+
+The detailed decision guide is in [Choose your setup](/getting-started/choose-your-setup).
+
+## 3. Configure a local stdio client
+
+Paste this entry into your MCP client, replacing `/path/to/repo` with the real workspace folder:
+
+```json
+{
+  "mcpServers": {
+    "coding-tools": {
+      "command": "uvx",
+      "args": ["coding-tools-mcp", "--stdio", "--workspace", "/path/to/repo"]
+    }
+  }
+}
+```
+
+Prefer Node.js? Use the same arguments through `npx`:
+
+```json
+{
+  "mcpServers": {
+    "coding-tools": {
+      "command": "npx",
+      "args": ["--yes", "coding-tools-mcp", "--stdio", "--workspace", "/path/to/repo"]
+    }
+  }
+}
+```
+
+Restart or reload the client after saving its configuration. Client-specific file locations and alternatives are in [Client configuration](/clients).
+
+## 4. Verify with a read-only request
+
+Ask the connected client:
+
+```text
+Inspect this repository and summarize its structure. Do not modify files or run commands yet.
+```
+
+A successful answer proves the complete path: client → MCP transport → Coding Tools MCP → workspace files. If the client says the server or tools are unavailable, go to [Troubleshooting](/troubleshooting) instead of randomly changing workspace or permission settings.
+
+## 5. Try one small, reviewable change
+
+After the read-only request works, ask for a bounded task:
+
+```text
+Find one small correctness or documentation issue in this repository, fix it,
+run the narrowest relevant check, and show me the diff before committing anything.
+```
+
+Then inspect the result yourself:
+
+```bash
+git status --short
+git diff
+```
+
+A good first task is small enough that you can review every changed line. You remain responsible for accepting, rejecting, or committing the change.
+
+## 6. Understand the permission default
+
+The default mode is `safe`. It is **not** read-only: file edits are part of the product, and commands run under server-side policy checks. Network-looking commands, shell expansion, inline scripts, destructive commands, and secret-looking environment variables receive extra scrutiny.
+
+Use `trusted` only for local development on code you trust:
+
+```bash
+coding-tools-mcp --permission-mode trusted --workspace /path/to/repo
+```
+
+Use `dangerous` only inside an isolated container or VM when the client cannot present permission prompts:
+
+```bash
+coding-tools-mcp --permission-mode dangerous --workspace /path/to/repo
+```
+
+The full security model stays in the core repository; start with the [security boundary](https://github.com/xyTom/coding-tools-mcp/blob/main/docs/security-boundary.md) and [permission modes](https://github.com/xyTom/coding-tools-mcp/blob/main/docs/permission-modes.md).
+
+## Optional: persistent install and HTTP
 
 Install the published command from PyPI:
 
@@ -9,42 +135,10 @@ Install the published command from PyPI:
 curl -fsSL https://raw.githubusercontent.com/xyTom/coding-tools-mcp/main/scripts/install.sh | bash
 ```
 
-Install and start local Streamable HTTP against a workspace:
+Start local Streamable HTTP against a workspace:
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/xyTom/coding-tools-mcp/main/scripts/install.sh \
-  | bash -s -- --start --workspace /path/to/repo
-```
-
-Install and expose an authenticated bearer-token tunnel:
-
-```bash
-curl -fsSL https://raw.githubusercontent.com/xyTom/coding-tools-mcp/main/scripts/install.sh \
-  | bash -s -- --tunnel cloudflared --auto-install-tunnel --workspace /path/to/repo
-```
-
-Or, from this checkout:
-
-```bash
-scripts/install.sh
-```
-
-Run the published package without a persistent install:
-
-```bash
-uvx coding-tools-mcp --workspace .
-```
-
-Use stdio for MCP clients:
-
-```bash
-uvx coding-tools-mcp --stdio --workspace /path/to/repo
-```
-
-When working from this checkout instead of a published package, start Streamable HTTP with:
-
-```bash
-make start
+uvx coding-tools-mcp --workspace /path/to/repo --port 8765
 ```
 
 Endpoint:
@@ -53,56 +147,19 @@ Endpoint:
 http://127.0.0.1:8765/mcp
 ```
 
-Pass a different workspace, host, port, or extra server flags with Make variables:
+Install and expose an authenticated bearer-token Cloudflare tunnel:
 
 ```bash
-make start MCP_WORKSPACE=/path/to/repo MCP_PORT=8000 MCP_ARGS="--permission-mode trusted"
+curl -fsSL https://raw.githubusercontent.com/xyTom/coding-tools-mcp/main/scripts/install.sh \
+  | bash -s -- --tunnel cloudflared --auto-install-tunnel --auth-mode bearer --workspace /path/to/repo
 ```
 
-If dependencies are missing, install the runtime in editable mode:
+Do not expose HTTP publicly without authentication. See [Remote access](/guides/remote-access).
 
-```bash
-python -m pip install -e ".[dev]"
-```
+## What next?
 
-Start stdio:
-
-```bash
-coding-tools-mcp --stdio --workspace /path/to/repo
-```
-
-Run the acceptance gate:
-
-```bash
-make compliance
-```
-
-For local trace debugging:
-
-```bash
-CODING_TOOLS_MCP_TRACE=1 coding-tools-mcp --workspace /path/to/repo
-```
-
-Trace JSON lines are written to stderr.
-
-For toolchains that require inherited shell variables, start the server with a broader shell environment policy:
-
-```bash
-CODING_TOOLS_MCP_SHELL_ENV_INHERIT=all coding-tools-mcp --workspace /path/to/repo
-```
-
-For local development with dependency downloads, shell expansion, and inline interpreter snippets, use trusted mode:
-
-```bash
-coding-tools-mcp --permission-mode trusted --workspace /path/to/repo
-```
-
-`--allow-network` remains a compatibility flag when you only want to open the network-looking command gate.
-
-If the MCP client cannot show permission prompts and you intentionally want to disable `exec_command` permission gates inside an isolated container or VM:
-
-```bash
-coding-tools-mcp --permission-mode dangerous --workspace /path/to/repo
-```
-
-Use this only with trusted workspaces and trusted clients in an externally hardened environment. `--dangerously-skip-all-permissions` remains as a compatibility alias.
+- [Choose your setup](/getting-started/choose-your-setup) — understand local, cloud, tunnel, authentication, and sandbox choices.
+- [Desktop app](/desktop) — the graphical path for non-terminal users and ChatGPT.
+- [Client configuration](/clients) — exact configuration for each MCP client.
+- [Exec command recipes](/guides/exec-command-recipes) — practical command execution patterns.
+- [Troubleshooting](/troubleshooting) — diagnose by layer instead of guessing.

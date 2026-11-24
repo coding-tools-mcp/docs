@@ -1,31 +1,54 @@
 ---
 title: 文档
-description: 了解如何安装、配置、安全运行和使用 Coding Tools MCP。
+description: 学习如何安装、配置、保护并运维 Coding Tools MCP。
 ---
 
-Coding Tools MCP 是一个通过 Model Context Protocol 提供能力、与具体模型无关的编码 runtime。它让 MCP 客户端可以在你明确配置的工作区内进行文件访问、结构化代码修改、命令执行、交互式进程管理和 Git 操作。
+Coding Tools MCP 是一个通过 Model Context Protocol 提供服务的模型中立 coding runtime。它让 MCP 客户端能够在一个配置好的工作区内访问文件、执行结构化代码修改、运行命令、维护交互式进程并执行 Git 操作。
 
-## 从这里开始
+## 我想……
 
-- [快速开始](/zh-CN/getting-started) — 安装 runtime，并连接第一个 MCP 客户端。
-- [客户端配置](/zh-CN/clients) — 配置 ChatGPT、Claude、Cursor、VS Code 等 MCP host。
-- [远程访问](/zh-CN/guides/remote-access) — 通过带认证的 HTTPS 隧道安全暴露本地 runtime。
-- [Docker 沙箱](/zh-CN/guides/docker-sandbox) — 在一次性容器中运行不可信工作负载。
-- [故障排查](/zh-CN/troubleshooting) — 排查协议、传输和 runtime 问题。
-- [生态与社区项目](/zh-CN/ecosystem) — 查看官方配套项目，以及基于 Coding Tools MCP 构建的社区 downstream 和集成。
+| 目标 | 从这里开始 |
+| --- | --- |
+| 在十分钟左右让一个本机客户端跑起来 | [快速开始](/zh-CN/getting-started) |
+| 判断自己需要 stdio、HTTP、桌面应用、隧道、OAuth 还是沙箱 | [选择你的使用方式](/zh-CN/getting-started/choose-your-setup) |
+| 使用图形应用而不是终端 | [桌面应用](/zh-CN/desktop) |
+| 配置 Claude、Codex、Cursor、VS Code、Windsurf、Gemini CLI、ChatGPT 或 Grok | [客户端配置](/zh-CN/clients) |
+| 把工作站暴露给云客户端或手机 | [远程访问](/zh-CN/guides/remote-access) |
+| 在一次性环境中评估不可信代码 | [Docker 沙箱](/zh-CN/guides/docker-sandbox) |
+| 排查连接、协议、权限或命令失败 | [故障排查](/zh-CN/troubleshooting) |
+| 把 runtime 嵌入自己的 agent | [Embedding 指南](/zh-CN/guides/embedding) |
+| 了解官方和社区项目 | [生态系统](/zh-CN/ecosystem) |
 
-## 给 AI Agent 使用
+## 先建立正确的心智模型
 
-文档站同时发布适合机器直接读取的 Markdown：
+新用户最应该读的是[选择你的使用方式](/zh-CN/getting-started/choose-your-setup)。它把三个容易混淆的问题分开：
 
-- [`llms.txt`](/zh-CN/llms.txt) — 精简的文档索引。
-- [`llms-full.txt`](/zh-CN/llms-full.txt) — 将完整中文文档合并成一个文本入口。
-- 每个文档页顶部的 **Copy Markdown / View options** 都可以直接获取当前页面的 Markdown。
+- runtime 跑在哪里；
+- 客户端如何连接它；
+- 如何控制访问和执行风险。
 
-当 Agent 需要读取项目文档时，优先使用这些入口，而不是解析渲染后的网页。
+这种拆分能避免最常见的错误：把隧道当成沙箱、把 `safe` 模式当成只读，或者在云客户端请求根本没到 server 时误查 workspace 权限。
+
+## 文档地图
+
+- **入门：** [快速开始](/zh-CN/getting-started)、[选择你的使用方式](/zh-CN/getting-started/choose-your-setup)、[桌面应用](/zh-CN/desktop)
+- **连接：** [客户端配置](/zh-CN/clients)、[远程访问](/zh-CN/guides/remote-access)
+- **安全使用：** [Docker 沙箱](/zh-CN/guides/docker-sandbox)、[Exec command 示例](/zh-CN/guides/exec-command-recipes)、[故障排查](/zh-CN/troubleshooting)
+- **集成与运维：** [Embedding](/zh-CN/guides/embedding)、[迁移指南](/zh-CN/migrations/0.5)、[参考](/zh-CN/reference)
+- **探索：** [生态系统与社区项目](/zh-CN/ecosystem)
+
+## 给 AI agent 使用
+
+文档站也发布机器友好的 Markdown：
+
+- [`llms.txt`](/zh-CN/llms.txt) — 文档的紧凑索引。
+- [`llms-full.txt`](/zh-CN/llms-full.txt) — 一次返回完整文档语料。
+- 每个文档页面顶部都有 **Copy Markdown / View options**，可以直接查看 Markdown。
+
+当 agent 需要项目文档、但不适合解析渲染后的网页时，使用这些 endpoint。
 
 ## 项目仓库
 
-核心 runtime 仍位于 [xyTom/coding-tools-mcp](https://github.com/xyTom/coding-tools-mcp)。Desktop 应用独立维护在 [coding-tools-mcp/desktop](https://github.com/coding-tools-mcp/desktop)。
+核心 runtime 仍在 [xyTom/coding-tools-mcp](https://github.com/xyTom/coding-tools-mcp)。桌面应用单独维护在 [coding-tools-mcp/desktop](https://github.com/coding-tools-mcp/desktop)。
 
-与源码强耦合的 runtime contract、schema、安全边界和测试证据继续以核心仓库为准。权威入口见 [参考资料](/zh-CN/reference)。社区扩展和 downstream 统一放在 [生态与社区项目](/zh-CN/ecosystem)，并明确区分官方组件和第三方项目。
+与源码耦合的 contract 和证据保留在核心仓库。权威位置见[参考](/zh-CN/reference)。社区维护的扩展和下游发行版放在[生态系统](/zh-CN/ecosystem)，官方项目与第三方项目会明确区分。

@@ -1,0 +1,178 @@
+---
+title: 选择你的使用方式
+description: 在配置客户端之前，先选对本地、桌面、云端、隧道、认证和沙箱组合。
+---
+
+大多数配置错误都来自把三个相互独立的决定混在一起：
+
+1. **runtime 跑在哪里**——你的工作站、桌面应用管理的本地进程、服务器、容器或 VM。
+2. **客户端如何连接它**——stdio、loopback HTTP，或 HTTPS 隧道/反向代理。
+3. **如何控制访问**——完全不公开、bearer token、URL token、Basic auth、OAuth、workspace permission mode，以及外部沙箱。
+
+隧道只是网络通路。认证只是访问检查。它们都不是沙箱，也不能让不可信代码变得可以安全执行。
+
+## 每种设置的共同结构
+
+```text
+AI 客户端
+  │
+  ├─ stdio：直接启动 runtime
+  │
+  └─ HTTP：连接 /mcp
+       │
+       ├─ 仅 loopback：http://127.0.0.1:8765/mcp
+       │
+       └─ 带认证的 HTTPS 隧道或反向代理
+            │
+            v
+     Coding Tools MCP
+            │
+            v
+       一个工作区
+```
+
+Coding Tools MCP 始终围绕一个配置好的 workspace。固定工具目录包含文件修改和命令执行，因此从第一次运行开始，暴露范围和权限选择就很重要。
+
+## 按目标选择
+
+| 目标 | 推荐设置 | 原因 | 注意事项 |
+| --- | --- | --- | --- |
+| 在自己仓库里使用本机 coding 客户端 | Claude Desktop、Claude Code、Codex、Cursor、Windsurf 或 Gemini CLI 的 stdio | 最简单；没有端口、隧道或公网凭据 | 使用正确的绝对工作区路径；修改配置后重启客户端 |
+| 手动测试 server，或连接本机只支持 URL 的工具 | 绑定 loopback 的 Streamable HTTP | 固定本地 URL：`http://127.0.0.1:8765/mcp` | 没有认证和沙箱时，不要绑定到公网 interface |
+| 完全不想碰终端 | [桌面应用](/zh-CN/desktop) | 图形化管理工作区、Core 安装、服务状态、凭据、隧道和诊断 | 桌面应用暴露的仍是真实文件和命令工具；谨慎选择工作区 |
+| 用 ChatGPT 或其他云客户端做一次演示 | 桌面应用 temporary sharing，或一条命令启动的 authenticated tunnel | 云客户端无法访问 `127.0.0.1`，必须使用 HTTPS | 含有 `?token=` 的完整 URL 就是密钥；临时地址重启后会变 |
+| 每天使用云客户端 | 固定公网地址加 OAuth 或其他强认证方式 | 固定 URL，登录流程更清晰 | 当前 core 的 OAuth dynamic registration 是进程内状态；重启行为需要注意 |
+| 分享给同事 | 有意识地运维一套 HTTPS 部署，而不是随手复制个人 token | 运维者可以控制暴露范围、日志、轮换和撤销 | 共享 token 意味着所有使用者拥有相同的有效权限 |
+| 评估不可信代码或可疑 PR | [Docker 沙箱](/zh-CN/guides/docker-sandbox)或 VM | 工作区可能执行攻击者控制的代码 | `safe` 模式和 Landlock 并不是所有平台上的完整 OS sandbox |
+| 把 Coding Tools MCP 嵌入自己的 agent | [Embedding 指南](/zh-CN/guides/embedding) | 直接讲 MCP，复用经过测试的工具边界 | runtime contract 细节仍以核心仓库为准 |
+
+## 该用哪种 transport？
+
+### stdio：最适合本机客户端
+
+如果客户端能启动本地命令，就优先用 stdio。客户端会启动 runtime，并通过标准输入/输出通信。
+
+优点：
+
+- 不需要选择端口；
+- 不需要隧道；
+- 没有公网凭据；
+- server 生命周期跟随客户端。
+
+典型配置：
+
+```json
+{
+  "command": "uvx",
+  "args": ["coding-tools-mcp", "--stdio", "--workspace", "/path/to/repo"]
+}
+```
+
+如果客户端是从图形桌面环境启动的，它可能不会继承终端里的 `PATH`。当 `uvx` 在终端可用、但客户端里不可用时，使用 `uvx`、`npx` 或已安装 `coding-tools-mcp` 可执行文件的绝对路径。
+
+### Loopback HTTP：最适合本机 URL 工具
+
+当客户端需要 server URL、并且与代码在同一台电脑上时使用 HTTP：
+
+```bash
+uvx coding-tools-mcp --workspace /path/to/repo --port 8765
+```
+
+Endpoint：
+
+```text
+http://127.0.0.1:8765/mcp
+```
+
+因为 server 绑定 loopback，所以它仍然只限本机。ChatGPT、手机、另一台电脑或云端浏览器并不能因为这个地址存在就连上它。
+
+### HTTPS 隧道或反向代理：云客户端必需
+
+ChatGPT、Grok、claude.ai、手机浏览器以及部署在其他位置的 agent 都无法访问你的 loopback 地址。请选择：
+
+- [桌面应用](/zh-CN/desktop)的 temporary 或 stable public access；
+- [带认证的隧道脚本](/zh-CN/guides/remote-access)；
+- 在 loopback server 前自行部署反向代理。
+
+所有公网部署都必须启用认证，因为工具目录包含文件修改和命令执行。永远不要公开 no-auth server。
+
+## 该用哪种认证方式？
+
+| 方式 | 最适合 | 密钥处理 |
+| --- | --- | --- |
+| Bearer token | 支持自定义 `Authorization` header 的客户端 | 以 `Authorization: Bearer <token>` 发送；泄露后轮换 |
+| Token in URL | 只接受一个 URL 的客户端，包括许多简单 connector 表单 | 完整 URL 就是密钥；不要粘贴到 issue、截图或日志中 |
+| Username and password | 提供 Basic-auth 用户名/密码流程的客户端 | 使用生成的密码；不要复用账号密码 |
+| OAuth 浏览器登录 | 支持 MCP OAuth discovery、并且你有稳定 HTTPS origin 的客户端 | 使用授权流程，不需要把静态 bearer header 复制进客户端 |
+| 无认证 | 仅 loopback 本机使用 | 永远不要用于公网 endpoint |
+
+具体可用方式取决于你直接运行 core，还是使用桌面应用。桌面应用可以在 core 前面提供 URL-token 和 Basic-auth 兼容层；见[桌面应用](/zh-CN/desktop)。
+
+## 该用哪种 permission mode？
+
+| 模式 | 使用时机 | 重要限制 |
+| --- | --- | --- |
+| `safe` | 默认日常使用 | 不是只读；允许文件编辑和经过策略检查的命令 |
+| `trusted` | 可信代码的本地开发，尤其是依赖安装和正常 shell 使用 | 仍不是沙箱；secret filtering 和 destructive-command checks 很重要 |
+| `dangerous` | 一次性容器或 VM，且客户端无法审批提示 | 禁用命令权限 gate 和 Landlock；不要为了省事在真实工作站工作区使用 |
+
+面对不可信仓库，先选择外层隔离——容器、VM 或一次性机器——然后再选择 permission mode。不要只是为了让提示消失而使用 `dangerous`。
+
+## 安全的首轮验收顺序
+
+无论选择哪条路径，都按这个顺序验证：
+
+1. **runtime 有响应**——客户端能看到 Coding Tools MCP server 或 tools。
+2. **工作区正确**——让客户端只读检查仓库结构，不修改文件。
+3. **写入路径符合预期**——让它做一个小的可审查修改，然后自己检查 `git diff`。
+4. **公网访问已认证**——使用隧道时，先把 URL 给客户端之前确认未认证请求会失败。
+5. **密钥没有暴露**——确认 token、`.env`、私钥、浏览器 cookie、云凭据不在工作区内，或已经受到其他保护。
+
+第一个提示词示例：
+
+```text
+Inspect this repository and summarize its structure. Do not modify files or run commands yet.
+```
+
+中文示例：
+
+```text
+检查这个仓库并总结它的结构。暂时不要修改文件，也不要运行命令。
+```
+
+第二个提示词示例：
+
+```text
+Find one small issue, fix it, run the narrowest relevant check, and show me the diff before committing anything.
+```
+
+中文示例：
+
+```text
+找一个小问题并修复它，运行范围最小的相关检查，在提交任何东西之前先向我展示 diff。
+```
+
+## 常见误解
+
+### “隧道是安全的，所以代码已经被沙箱隔离。”
+
+不是。隧道提供网络连通和 TLS。认证决定谁可以连接。沙箱决定代码开始运行后能做什么。这是三个不同层次。
+
+### “Safe mode 就是只读。”
+
+不是。Safe mode 是默认的策略门控模式，不是只读产品形态。文件修改本来就是预期能力。如果需要更强的命令写入隔离，请先阅读核心仓库的 workspace mutation policy，确认边界后再依赖它。
+
+### “公网 URL 很难猜，所以可以直接公开。”
+
+不可以。难以猜测的 URL 如果包含 token，它本身就是 bearer secret；如果 URL 不含 token，它也不能替代认证。请把 connector URL 当作凭据处理。
+
+### “ChatGPT 连不上，所以一定是 workspace permission mode 错了。”
+
+通常不是。先判断请求是否真的到达 server。客户端 connector 配置、公网可达性、认证、server runtime 和 workspace 权限是不同层次。请使用[故障排查](/zh-CN/troubleshooting)。
+
+## 推荐路径
+
+- **本机新用户：** [快速开始](/zh-CN/getting-started) → stdio 客户端 → 只读验证 → 一个小修改。
+- **不想用终端的新用户：** [桌面应用](/zh-CN/desktop) → 本机工作区 → 本地验证 → 确有需要时再开启公网访问。
+- **ChatGPT 新用户：** [桌面应用](/zh-CN/desktop) → Token in URL 的 temporary sharing → 验证一次真实项目读取 → 之后再考虑固定地址。
+- **评估不可信代码：** [Docker 沙箱](/zh-CN/guides/docker-sandbox) → 把可疑代码复制进一次性环境 → 永远不要指向真实 home 目录。

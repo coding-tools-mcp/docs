@@ -1,13 +1,28 @@
 ---
 title: MCP 客户端配置
-description: 在常见 MCP 客户端中配置 Coding Tools MCP。
+description: 在常见 MCP 客户端中配置 Coding Tools MCP，并为每种环境选择正确的 transport 和认证方式。
 ---
+
+正确配置首先取决于客户端运行在哪里，而不是客户端品牌：
+
+| 客户端环境 | 推荐连接方式 | 认证 |
+| --- | --- | --- |
+| 与仓库在同一台电脑上的桌面或 CLI 客户端 | 由客户端启动的 stdio | 本地进程边界内不需要额外认证 |
+| 同一台电脑上只接受 URL 的工具 | `http://127.0.0.1:8765/mcp` 的 loopback Streamable HTTP | 仅限本机；不要公开暴露 |
+| ChatGPT、Grok、claude.ai、手机或其他云客户端 | 带认证的 HTTPS 隧道或[桌面应用](/zh-CN/desktop) | 取决于客户端：Bearer、Token in URL、Basic 或 OAuth |
+| 同事的机器或共享服务器 | 有意识地运维的 HTTPS 部署 | 由运维者持有并管理作用域凭据 |
+
+如果不确定，请先阅读[选择你的使用方式](/zh-CN/getting-started/choose-your-setup)。在不知道哪个 secret 授权访问之前，不要把公网 endpoint 粘贴进客户端。
+
+## 协议兼容性
 
 Coding Tools MCP 同时支持两代协议。使用 `2026-07-28` 的客户端不需要握手：通过 `server/discover` 发现 server，并在每个请求中声明协议版本。握手式客户端使用 `2025-11-25`，现有客户端仍可继续使用 `2025-06-18`。
 
-## Claude Desktop
+通常不需要手工配置协议版本。如果客户端表现得像协商到了旧协议，请读取 `InitializeResult` 返回的 `protocolVersion`，不要只相信请求时发送的版本。
 
-编辑 `claude_desktop_config.json`。macOS 路径为 `~/Library/Application Support/Claude/`，Windows 路径为 `%APPDATA%\Claude\`。保存后重启 Claude Desktop：
+## 标准本机 stdio 配置
+
+大多数本机客户端使用同一种 JSON 结构。把 `/path/to/repo` 替换成真实工作区路径：
 
 ```json
 {
@@ -20,7 +35,44 @@ Coding Tools MCP 同时支持两代协议。使用 `2026-07-28` 的客户端不�
 }
 ```
 
+Node.js 等价写法：
+
+```json
+{
+  "mcpServers": {
+    "coding-tools": {
+      "command": "npx",
+      "args": ["--yes", "coding-tools-mcp", "--stdio", "--workspace", "/path/to/repo"]
+    }
+  }
+}
+```
+
+修改客户端配置后，重启或重新加载该客户端。从图形界面启动的客户端通常不会继承终端里的 `PATH`；如果 `uvx` 在终端可用、但客户端无法启动它，请使用 `which uvx` 或 `which npx` 输出的绝对路径。
+
+## Claude Desktop
+
+编辑 `claude_desktop_config.json`，然后重启 Claude Desktop：
+
+- macOS：`~/Library/Application Support/Claude/claude_desktop_config.json`
+- Windows：`%APPDATA%\Claude\claude_desktop_config.json`
+
+```json
+{
+  "mcpServers": {
+    "coding-tools": {
+      "command": "uvx",
+      "args": ["coding-tools-mcp", "--stdio", "--workspace", "/path/to/repo"]
+    }
+  }
+}
+```
+
+如果 Claude Desktop 已经打开，请完全退出后重新打开。然后让它在不修改文件的情况下检查仓库结构。
+
 ## Codex
+
+在 Codex 的 MCP 配置中加入：
 
 ```toml
 [mcp_servers.coding_tools]
@@ -28,7 +80,11 @@ command = "uvx"
 args = ["coding-tools-mcp", "--stdio", "--workspace", "/path/to/repo"]
 ```
 
+使用绝对工作区路径。如果使用 `npx`，请把 `--yes` 放在 `coding-tools-mcp` 前面。
+
 ## Claude Code
+
+配置文件形式：
 
 ```json
 {
@@ -41,7 +97,7 @@ args = ["coding-tools-mcp", "--stdio", "--workspace", "/path/to/repo"]
 }
 ```
 
-也可以直接使用命令行：
+命令行形式：
 
 ```bash
 claude mcp add coding-tools -- uvx coding-tools-mcp --stdio --workspace /path/to/repo
@@ -49,6 +105,8 @@ claude mcp add coding-tools -- uvx coding-tools-mcp --stdio --workspace /path/to
 
 ## Cursor
 
+使用标准本机 stdio 配置：
+
 ```json
 {
   "mcpServers": {
@@ -59,6 +117,8 @@ claude mcp add coding-tools -- uvx coding-tools-mcp --stdio --workspace /path/to
   }
 }
 ```
+
+修改 MCP 配置后重启 Cursor。如果 Cursor 找不到 `uvx`，请配置可执行文件的绝对路径。
 
 ## VS Code
 
@@ -76,7 +136,7 @@ GitHub Copilot 会读取工作区中的 `.vscode/mcp.json`：
 }
 ```
 
-如果使用本地 HTTP server，则将 `"type"` 改为 `"http"`，并配置 `"url"` 与 `"headers"`。
+如果使用本地 HTTP server，则将 `"type"` 改为 `"http"`，并配置 `"url"`；需要时再配置 `"headers"`。除非已经明确加入认证和外部隔离，否则 HTTP server 应保持在 loopback。
 
 ## Windsurf
 
@@ -114,7 +174,7 @@ gemini mcp add coding-tools -- uvx coding-tools-mcp --stdio --workspace /path/to
 }
 ```
 
-如果使用本地 HTTP server：
+如果使用本地 HTTP server，transport `http` 会完全取代 command：
 
 ```bash
 gemini mcp add --transport http coding-tools http://127.0.0.1:8765/mcp
@@ -122,23 +182,33 @@ gemini mcp add --transport http coding-tools http://127.0.0.1:8765/mcp
 
 带认证的 endpoint 可以通过 `--header "Authorization: Bearer <token>"` 传入 token。Server name 尽量不要使用下划线：Gemini CLI 会根据名称生成 tool name，并在第一个下划线处分割。
 
-## Continue、Cursor、Cline 与通用 HTTP 客户端
+## 通用本机 HTTP 客户端
 
-配置 Streamable HTTP MCP server：
+在 loopback 上启动 server：
+
+```bash
+uvx coding-tools-mcp --workspace /path/to/repo --port 8765
+```
+
+客户端配置：
 
 ```text
 http://127.0.0.1:8765/mcp
 ```
 
-这个 server 默认设计用于本机 loopback。没有外部认证和沙箱时，不要直接绑定到公网 interface。
+这个 endpoint 设计用于本机 loopback。没有外部认证和沙箱时，不要绑定到公网 interface。
 
-## Remote MCP
+## Remote MCP 与云客户端
 
-远程客户端应继续让 server 只监听 loopback，再通过带认证的 HTTPS 隧道暴露。固定 tool set 中包含 mutation 与命令执行能力：
+远程客户端应继续让 server 只监听 loopback，再通过带认证的 HTTPS 隧道暴露。固定 tool set 包含文件修改与命令执行，因此公网 endpoint 绝不能无认证。
+
+在 macOS 上使用 `--auto-install-tunnel` 前，如果系统里没有 Homebrew，请先手动安装 `cloudflared`；脚本的直接下载 fallback 不能处理 Cloudflare 的 macOS `.tgz` 包。
+
+建议先安装 [`uv`](https://docs.astral.sh/uv/getting-started/installation/)。没有 `uv` 时，安装脚本会 fallback 到 `pip install --user`；externally managed Python 可能拒绝这种安装，导致 tunnel 无法启动。
 
 ```bash
-CODING_TOOLS_MCP_AUTH_MODE=bearer \
-integrations/tunnels/tunnel.sh cloudflared /path/to/repo
+curl -fsSL https://raw.githubusercontent.com/xyTom/coding-tools-mcp/main/scripts/install.sh \
+  | bash -s -- --tunnel cloudflared --auto-install-tunnel --auth-mode bearer --workspace /path/to/repo
 ```
 
 远程客户端配置：
@@ -147,19 +217,34 @@ integrations/tunnels/tunnel.sh cloudflared /path/to/repo
 URL: https://<tunnel-host>/mcp
 ```
 
-如果客户端支持自定义 `Authorization` header，可以使用静态 bearer token。支持 OAuth 的 MCP 客户端可以使用 `--oauth-mode`：server 会发布 protected-resource / authorization-server discovery、RFC 7591 dynamic registration 和 PKCE authorization flow。如果两者都不支持，则需要外部 authenticated proxy。详见 [远程访问](/zh-CN/guides/remote-access)。
+如果客户端支持自定义 `Authorization` header，可以使用静态 bearer token。支持 OAuth 的 MCP 客户端可以使用 OAuth tunnel：server 会发布 protected-resource / authorization-server discovery、RFC 7591 dynamic registration 和 PKCE authorization flow。两者都不支持的客户端需要外部 authenticated proxy，或使用桌面应用提供的兼容认证方式。详见[远程访问](/zh-CN/guides/remote-access)。
 
 ## ChatGPT
 
-ChatGPT 是云端客户端，不能直接启动你的本地进程，因此必须使用上面的 authenticated HTTPS tunnel。ChatGPT 的 custom connector 支持 OAuth 或 no-auth，但没有地方让你手工填静态 bearer header。
+ChatGPT 是云端客户端：它不能启动 `uvx`，也无法访问你电脑上的 `127.0.0.1`。你需要一个公网 HTTPS endpoint。
+
+### 大多数人推荐：桌面应用
+
+最简单的路径是[桌面应用](/zh-CN/desktop)：
+
+1. 创建使用 **Temporary sharing** 或 **Stable public access** 的工作区。
+2. 选择 **Token in URL** 认证。
+3. 启动工作区并点击 **Copy endpoint**。复制到的 URL 已经包含 secret token。
+4. 在 ChatGPT 中添加 custom MCP server/plugin，粘贴 URL，并选择 **No authentication**，因为 token 已经在 URL 里。
+5. 用一次真实的只读项目请求验证。
+
+ChatGPT 的具体文案会因套餐、workspace 和灰度版本而不同。请把完整的 `?token=` URL 当作密码，不要粘贴到截图、issue、日志或聊天消息里。
+
+### 高级直接运行 core：OAuth tunnel
+
+如果你直接运维 core，启动 OAuth tunnel：
 
 ```bash
-CODING_TOOLS_MCP_AUTH_MODE=oauth integrations/tunnels/tunnel.sh cloudflared /path/to/repo
+curl -fsSL https://raw.githubusercontent.com/xyTom/coding-tools-mcp/main/scripts/install.sh \
+  | bash -s -- --tunnel cloudflared --auto-install-tunnel --auth-mode oauth --workspace /path/to/repo
 ```
 
-在 ChatGPT 中开启 developer mode（Settings → Connectors → Advanced settings），然后创建 custom connector，URL 指向 `https://<tunnel-host>/mcp`。
-
-如果 ChatGPT 能自动发现 OAuth endpoint，授权页面会要求输入脚本打印的 password。如果 connector 表单要求手动填写：
+在 ChatGPT 中创建 custom connector 或 MCP app，URL 指向 `https://<tunnel-host>/mcp`。如果 ChatGPT 能自动发现 OAuth endpoint，授权页面会要求输入脚本打印的 password。如果 connector 表单要求手动填写：
 
 - Authorization URL：`https://<tunnel-host>/oauth/authorize`
 - Token URL：`https://<tunnel-host>/oauth/token`
@@ -180,3 +265,27 @@ grok.com 同样是纯云端客户端。启动相同的 OAuth tunnel，然后在 
 ```
 
 Grok 侧只支持 Streamable HTTP 和 SSE transport；我们的 tunnel 已经提供所需的 HTTP transport。
+
+## 信任客户端之前先验证
+
+配置完成后，按这个顺序验收：
+
+1. 让客户端在不修改文件的情况下列出或检查仓库。
+2. 确认回答中提到的文件确实存在于目标工作区。
+3. 让它做一个小的可审查修改。
+4. 自己检查 `git status --short` 和 `git diff`。
+5. 如果使用公网 endpoint，确认未认证请求无法使用 MCP endpoint。
+
+推荐的第一个提示词：
+
+```text
+Inspect this repository and summarize its structure. Do not modify files or run commands yet.
+```
+
+中文示例：
+
+```text
+检查这个仓库并总结它的结构。暂时不要修改文件，也不要运行命令。
+```
+
+如果失败，请进入[故障排查](/zh-CN/troubleshooting)，先定位失败层：客户端配置、进程启动、loopback server、隧道可达性、认证，或 workspace 权限。

@@ -5,11 +5,15 @@ description: 通过 HTTPS 安全发布本地 Coding Tools MCP server。
 
 `coding-tools-mcp` 在 `/mcp` 暴露 Streamable HTTP。建议始终只监听 loopback，再通过 HTTPS 隧道发布。固定 tool set 中包含 `apply_patch` 和 `exec_command`，不存在一个自动缩减的“只读工具集”，因此任何公网部署都必须使用 bearer auth、OAuth，或外部 authenticated proxy。
 
+在 macOS 上使用 `--auto-install-tunnel` 前，如果系统里没有 Homebrew，请先手动安装 `cloudflared`；脚本的直接下载 fallback 不能处理 Cloudflare 的 macOS `.tgz` 包。
+
+建议先安装 [`uv`](https://docs.astral.sh/uv/getting-started/installation/)。没有 `uv` 时，安装脚本会 fallback 到 `pip install --user`；externally managed Python 可能拒绝这种安装，导致 tunnel 无法启动。
+
 ## 一条命令启动 bearer tunnel
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/xyTom/coding-tools-mcp/main/scripts/install.sh \
-  | bash -s -- --tunnel cloudflared --auto-install-tunnel --workspace /path/to/repo
+  | bash -s -- --tunnel cloudflared --auto-install-tunnel --auth-mode bearer --workspace /path/to/repo
 ```
 
 脚本会生成 bearer token，让 server 监听 `127.0.0.1`，并打印 HTTPS tunnel URL 与 header：
@@ -28,13 +32,27 @@ CODING_TOOLS_MCP_AUTH_MODE=bearer integrations/tunnels/tunnel.sh cloudflared /pa
 
 脚本同样支持 `ngrok` 和 `devtunnel`。
 
+### 稳定的 Cloudflare 隧道
+
+上面的 install-script 命令预期启动临时 Cloudflare Quick Tunnel。只有在你确认本机 `cloudflared` 配置可控时才应使用这条快速路径：已有本地 ingress 规则可能优先于 `--url` 的 loopback 目标，从而把错误的服务发布到公网。不确定时，使用命名隧道或其他你显式配置的反向代理。
+
+要使用稳定的 Cloudflare hostname，先在 Cloudflare 中创建 remotely managed named tunnel，并把它的 public hostname 路由到 `http://127.0.0.1:8765`（或你选择的端口）。从源码 checkout 中设置且只设置一个 Cloudflare 凭据变量，然后启动 tunnel integration：
+
+```bash
+export TUNNEL_TOKEN_FILE=/path/to/private/cloudflare-tunnel-token.txt
+export CODING_TOOLS_MCP_SERVER_URL=https://mcp.example.com
+CODING_TOOLS_MCP_AUTH_MODE=oauth integrations/tunnels/tunnel.sh cloudflared /path/to/repo
+```
+
+也可以用 `TUNNEL_TOKEN` 代替 `TUNNEL_TOKEN_FILE`。不要把 token 放进仓库、shell history 或命令行参数。把 `CODING_TOOLS_MCP_SERVER_URL` 设置为不包含 `/mcp` 的公网 HTTPS origin，这样 OAuth discovery 和 token audience 都会使用稳定 hostname。命名隧道只能固定 hostname；server 重启后，进程内的 OAuth dynamic client registration 仍然会重置。
+
 ## OAuth 2.1 + dynamic registration
 
 对于不能设置静态 `Authorization` header、但支持 MCP OAuth discovery 的客户端：
 
 ```bash
-CODING_TOOLS_MCP_AUTH_MODE=oauth \
-integrations/tunnels/tunnel.sh cloudflared /path/to/repo
+curl -fsSL https://raw.githubusercontent.com/xyTom/coding-tools-mcp/main/scripts/install.sh \
+  | bash -s -- --tunnel cloudflared --auto-install-tunnel --auth-mode oauth --workspace /path/to/repo
 ```
 
 Server 实现 Authorization Code + PKCE S256 和 RFC 7591 dynamic client registration。客户端可以自行发现并注册，不需要操作人员手工生成 client ID，也不需要把 client secret 复制进 MCP host。脚本会打印 operator 在授权页面输入的 password。

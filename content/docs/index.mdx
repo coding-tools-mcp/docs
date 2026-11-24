@@ -5,14 +5,37 @@ description: Learn how to install, configure, secure, and operate Coding Tools M
 
 Coding Tools MCP is a model-neutral coding runtime served over the Model Context Protocol. It gives MCP clients file access, structured code changes, command execution, interactive processes, and Git operations inside one configured workspace.
 
-## Start here
+## I want to…
 
-- [Quickstart](/getting-started) — install the runtime and connect your first client.
-- [Client configuration](/clients) — configure ChatGPT, Claude, Cursor, VS Code, and other MCP hosts.
-- [Remote access](/guides/remote-access) — expose a local runtime through an authenticated HTTPS tunnel.
-- [Docker sandbox](/guides/docker-sandbox) — run untrusted work in a disposable container.
-- [Troubleshooting](/troubleshooting) — diagnose protocol, transport, and runtime problems.
-- [Ecosystem & community projects](/ecosystem) — discover official companion projects and community-maintained downstreams built on Coding Tools MCP.
+| Goal | Start here |
+| --- | --- |
+| Get one local client working in about ten minutes | [Quickstart](/getting-started) |
+| Understand whether I need stdio, HTTP, Desktop, a tunnel, OAuth, or a sandbox | [Choose your setup](/getting-started/choose-your-setup) |
+| Use a graphical app instead of a terminal | [Desktop app](/desktop) |
+| Configure Claude, Codex, Cursor, VS Code, Windsurf, Gemini CLI, ChatGPT, or Grok | [Client configuration](/clients) |
+| Expose a workstation to a cloud client or phone | [Remote access](/guides/remote-access) |
+| Evaluate untrusted code in a disposable environment | [Docker sandbox](/guides/docker-sandbox) |
+| Diagnose a connection, protocol, permission, or command failure | [Troubleshooting](/troubleshooting) |
+| Embed the runtime in my own agent | [Embedding guide](/guides/embedding) |
+| Discover official and community projects | [Ecosystem](/ecosystem) |
+
+## Learn the mental model first
+
+The most important documentation page for a new user is [Choose your setup](/getting-started/choose-your-setup). It separates three questions that are easy to confuse:
+
+- where the runtime runs;
+- how the client reaches it;
+- how access and execution risk are controlled.
+
+That separation prevents the most common mistakes: treating a tunnel as a sandbox, treating `safe` mode as read-only, or debugging workspace permissions when a cloud client never reached the server.
+
+## Documentation map
+
+- **Start:** [Quickstart](/getting-started), [Choose your setup](/getting-started/choose-your-setup), [Desktop app](/desktop)
+- **Connect:** [Client configuration](/clients), [Remote access](/guides/remote-access)
+- **Use safely:** [Docker sandbox](/guides/docker-sandbox), [Exec command recipes](/guides/exec-command-recipes), [Troubleshooting](/troubleshooting)
+- **Integrate and operate:** [Embedding](/guides/embedding), [Migrations](/migrations/0.5), [Reference](/reference)
+- **Explore:** [Ecosystem & community projects](/ecosystem)
 
 ## For AI agents
 

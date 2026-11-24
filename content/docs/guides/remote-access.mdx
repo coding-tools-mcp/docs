@@ -13,7 +13,7 @@ proxy.
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/xyTom/coding-tools-mcp/main/scripts/install.sh \
-  | bash -s -- --tunnel cloudflared --auto-install-tunnel --workspace /path/to/repo
+  | bash -s -- --tunnel cloudflared --auto-install-tunnel --auth-mode bearer --workspace /path/to/repo
 ```
 
 The script generates a bearer token, starts the server on `127.0.0.1`, and
@@ -39,8 +39,8 @@ For clients that cannot set a static `Authorization` header but support MCP
 OAuth discovery:
 
 ```bash
-CODING_TOOLS_MCP_AUTH_MODE=oauth \
-integrations/tunnels/tunnel.sh cloudflared /path/to/repo
+curl -fsSL https://raw.githubusercontent.com/xyTom/coding-tools-mcp/main/scripts/install.sh \
+  | bash -s -- --tunnel cloudflared --auto-install-tunnel --auth-mode oauth --workspace /path/to/repo
 ```
 
 The server implements Authorization Code + PKCE S256 and RFC 7591 dynamic

@@ -187,7 +187,7 @@ Authenticated endpoints take `--header "Authorization: Bearer <token>"`. Keep th
 Start the server on loopback:
 
 ```bash
-uvx coding-tools-mcp --workspace /path/to/repo
+uvx coding-tools-mcp --workspace /path/to/repo --port 8765
 ```
 
 Configure the client with:
@@ -203,8 +203,8 @@ This endpoint is designed for local loopback use. Do not bind it to a public int
 For remote MCP clients, keep the server on loopback and expose it through an HTTPS tunnel with authentication. The fixed tool set includes mutation and command execution, so a public endpoint must never be unauthenticated:
 
 ```bash
-CODING_TOOLS_MCP_AUTH_MODE=bearer \
-integrations/tunnels/tunnel.sh cloudflared /path/to/repo
+curl -fsSL https://raw.githubusercontent.com/xyTom/coding-tools-mcp/main/scripts/install.sh \
+  | bash -s -- --tunnel cloudflared --auto-install-tunnel --auth-mode bearer --workspace /path/to/repo
 ```
 
 Configure the remote client with:
@@ -213,7 +213,7 @@ Configure the remote client with:
 URL: https://<tunnel-host>/mcp
 ```
 
-Static bearer-token auth is available for clients that support custom `Authorization` headers. OAuth-aware MCP clients can use `--oauth-mode`, which publishes protected-resource and authorization-server discovery plus RFC 7591 dynamic registration and a PKCE authorization flow. Clients that support neither require an external authenticated proxy or a Desktop-provided compatibility auth method. See [Remote access](/guides/remote-access).
+Static bearer-token auth is available for clients that support custom `Authorization` headers. OAuth-aware MCP clients can use the OAuth tunnel, which publishes protected-resource and authorization-server discovery plus RFC 7591 dynamic registration and a PKCE authorization flow. Clients that support neither require an external authenticated proxy or a Desktop-provided compatibility auth method. See [Remote access](/guides/remote-access).
 
 ## ChatGPT
 
@@ -236,7 +236,8 @@ Exact ChatGPT labels vary by plan, workspace, and rollout. Treat the complete `?
 If you operate the core directly, start an OAuth tunnel:
 
 ```bash
-CODING_TOOLS_MCP_AUTH_MODE=oauth integrations/tunnels/tunnel.sh cloudflared /path/to/repo
+curl -fsSL https://raw.githubusercontent.com/xyTom/coding-tools-mcp/main/scripts/install.sh \
+  | bash -s -- --tunnel cloudflared --auto-install-tunnel --auth-mode oauth --workspace /path/to/repo
 ```
 
 In ChatGPT, create a custom connector or MCP app pointing at `https://<tunnel-host>/mcp`. If ChatGPT discovers the OAuth endpoints itself, the authorization page asks for the password printed by the script. If the connector form asks for details instead, fill them in:

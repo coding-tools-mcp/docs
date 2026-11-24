@@ -187,7 +187,7 @@ gemini mcp add --transport http coding-tools http://127.0.0.1:8765/mcp
 在 loopback 上启动 server：
 
 ```bash
-uvx coding-tools-mcp --workspace /path/to/repo
+uvx coding-tools-mcp --workspace /path/to/repo --port 8765
 ```
 
 客户端配置：
@@ -203,8 +203,8 @@ http://127.0.0.1:8765/mcp
 远程客户端应继续让 server 只监听 loopback，再通过带认证的 HTTPS 隧道暴露。固定 tool set 包含文件修改与命令执行，因此公网 endpoint 绝不能无认证：
 
 ```bash
-CODING_TOOLS_MCP_AUTH_MODE=bearer \
-integrations/tunnels/tunnel.sh cloudflared /path/to/repo
+curl -fsSL https://raw.githubusercontent.com/xyTom/coding-tools-mcp/main/scripts/install.sh \
+  | bash -s -- --tunnel cloudflared --auto-install-tunnel --auth-mode bearer --workspace /path/to/repo
 ```
 
 远程客户端配置：
@@ -213,7 +213,7 @@ integrations/tunnels/tunnel.sh cloudflared /path/to/repo
 URL: https://<tunnel-host>/mcp
 ```
 
-如果客户端支持自定义 `Authorization` header，可以使用静态 bearer token。支持 OAuth 的 MCP 客户端可以使用 `--oauth-mode`：server 会发布 protected-resource / authorization-server discovery、RFC 7591 dynamic registration 和 PKCE authorization flow。两者都不支持的客户端需要外部 authenticated proxy，或使用桌面应用提供的兼容认证方式。详见[远程访问](/zh-CN/guides/remote-access)。
+如果客户端支持自定义 `Authorization` header，可以使用静态 bearer token。支持 OAuth 的 MCP 客户端可以使用 OAuth tunnel：server 会发布 protected-resource / authorization-server discovery、RFC 7591 dynamic registration 和 PKCE authorization flow。两者都不支持的客户端需要外部 authenticated proxy，或使用桌面应用提供的兼容认证方式。详见[远程访问](/zh-CN/guides/remote-access)。
 
 ## ChatGPT
 
@@ -236,7 +236,8 @@ ChatGPT 的具体文案会因套餐、workspace 和灰度版本而不同。请�
 如果你直接运维 core，启动 OAuth tunnel：
 
 ```bash
-CODING_TOOLS_MCP_AUTH_MODE=oauth integrations/tunnels/tunnel.sh cloudflared /path/to/repo
+curl -fsSL https://raw.githubusercontent.com/xyTom/coding-tools-mcp/main/scripts/install.sh \
+  | bash -s -- --tunnel cloudflared --auto-install-tunnel --auth-mode oauth --workspace /path/to/repo
 ```
 
 在 ChatGPT 中创建 custom connector 或 MCP app，URL 指向 `https://<tunnel-host>/mcp`。如果 ChatGPT 能自动发现 OAuth endpoint，授权页面会要求输入脚本打印的 password。如果 connector 表单要求手动填写：

@@ -9,7 +9,7 @@ description: 通过 HTTPS 安全发布本地 Coding Tools MCP server。
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/xyTom/coding-tools-mcp/main/scripts/install.sh \
-  | bash -s -- --tunnel cloudflared --auto-install-tunnel --workspace /path/to/repo
+  | bash -s -- --tunnel cloudflared --auto-install-tunnel --auth-mode bearer --workspace /path/to/repo
 ```
 
 脚本会生成 bearer token，让 server 监听 `127.0.0.1`，并打印 HTTPS tunnel URL 与 header：
@@ -33,8 +33,8 @@ CODING_TOOLS_MCP_AUTH_MODE=bearer integrations/tunnels/tunnel.sh cloudflared /pa
 对于不能设置静态 `Authorization` header、但支持 MCP OAuth discovery 的客户端：
 
 ```bash
-CODING_TOOLS_MCP_AUTH_MODE=oauth \
-integrations/tunnels/tunnel.sh cloudflared /path/to/repo
+curl -fsSL https://raw.githubusercontent.com/xyTom/coding-tools-mcp/main/scripts/install.sh \
+  | bash -s -- --tunnel cloudflared --auto-install-tunnel --auth-mode oauth --workspace /path/to/repo
 ```
 
 Server 实现 Authorization Code + PKCE S256 和 RFC 7591 dynamic client registration。客户端可以自行发现并注册，不需要操作人员手工生成 client ID，也不需要把 client secret 复制进 MCP host。脚本会打印 operator 在授权页面输入的 password。

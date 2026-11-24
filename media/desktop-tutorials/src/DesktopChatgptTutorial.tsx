@@ -32,27 +32,17 @@ type SceneSpec = {
   stateImage?: { at: number; image: string };
   seconds: number;
   focus: Rect;
-  endFocus?: Rect;
   title: string;
   body: string;
   actions?: MouseAction[];
 };
 
-const full: Rect = { x: 0, y: 0, w: IMAGE_WIDTH, h: IMAGE_HEIGHT };
-
 const smooth = (t: number) => t * t * (3 - 2 * t);
 const clamp01 = (t: number) => Math.max(0, Math.min(1, t));
 
-const mixRect = (a: Rect, b: Rect, t: number): Rect => ({
-  x: interpolate(t, [0, 1], [a.x, b.x]),
-  y: interpolate(t, [0, 1], [a.y, b.y]),
-  w: interpolate(t, [0, 1], [a.w, b.w]),
-  h: interpolate(t, [0, 1], [a.h, b.h]),
-});
-
 const transformFor = (rect: Rect) => {
   const fit = Math.max(WIDTH / rect.w, HEIGHT / rect.h);
-  const scale = Math.min(fit, 1.72);
+  const scale = Math.min(fit, 1.35);
   let x = WIDTH / 2 - (rect.x + rect.w / 2) * scale;
   let y = (HEIGHT - 110) / 2 - (rect.y + rect.h / 2) * scale;
 
@@ -197,8 +187,7 @@ const ScreenScene: React.FC<{ scene: SceneSpec; step: string }> = ({ scene, step
   const frame = useCurrentFrame();
   const duration = scene.seconds * FPS;
   const time = frame / FPS;
-  const panT = smooth(clamp01(frame / Math.max(1, duration - 8)));
-  const focus = mixRect(scene.focus, scene.endFocus ?? scene.focus, panT);
+  const focus = scene.focus;
   const transform = transformFor(focus);
   const image = scene.stateImage && time >= scene.stateImage.at ? scene.stateImage.image : scene.image;
   const cursor = scene.actions ? mouseState(scene.actions, time) : null;
@@ -329,7 +318,7 @@ const CardScene: React.FC<{
 
 type Copy = {
   intro: { title: string; subtitle: string; bullets: string[] };
-  scenes: Omit<SceneSpec, "image" | "seconds" | "focus" | "endFocus" | "actions">[];
+  scenes: Omit<SceneSpec, "image" | "seconds" | "focus" | "actions">[];
   final: { title: string; subtitle: string; bullets: string[] };
 };
 
@@ -338,23 +327,23 @@ const english: Copy = {
     title: "Connect ChatGPT to a workspace",
     subtitle: "A focused click-through using Coding Tools MCP Desktop — watch the cursor, highlights, and zoomed regions.",
     bullets: [
-      "Copy the authenticated public endpoint in Desktop.",
-      "Paste it into ChatGPT as a custom MCP server.",
+      "Choose public access and Token in URL authentication.",
+      "Copy the endpoint, then paste it into ChatGPT as a custom MCP server.",
       "Verify with one real read-only workspace request.",
     ],
   },
   scenes: [
     {
-      title: "Copy the secure endpoint",
-      body: "Start the workspace, then copy the public endpoint. The URL already carries the token.",
-    },
-    {
       title: "Choose how the workspace is exposed",
-      body: "Temporary sharing is enough for a demo; use stable public access for a permanent setup.",
+      body: "In the wizard, use Temporary sharing for a demo; choose stable public access for a permanent setup.",
     },
     {
       title: "Use Token in URL for ChatGPT",
       body: "ChatGPT can treat the complete URL as the credential, so the dialog can remain No authentication.",
+    },
+    {
+      title: "Copy the secure endpoint",
+      body: "Start the workspace, then copy the public endpoint. The URL already carries the token.",
     },
     {
       title: "Add a custom MCP server in ChatGPT",
@@ -385,23 +374,23 @@ const chinese: Copy = {
     title: "把 ChatGPT 连接到工作区",
     subtitle: "这是 Coding Tools MCP Desktop 的重点点击演示——注意鼠标轨迹、高亮框和局部放大。",
     bullets: [
-      "在 Desktop 中复制带认证的公网 endpoint。",
-      "把它作为 custom MCP server 粘贴到 ChatGPT。",
+      "选择公网访问方式和 Token in URL 认证。",
+      "复制 endpoint，并作为 custom MCP server 粘贴到 ChatGPT。",
       "用一次真实的只读工作区请求完成验收。",
     ],
   },
   scenes: [
     {
-      title: "复制安全 endpoint",
-      body: "启动工作区后复制公网 endpoint。这个 URL 已经携带 token。",
-    },
-    {
       title: "选择工作区暴露方式",
-      body: "演示用 Temporary sharing 就够了；长期使用时选择 stable public access。",
+      body: "在工作区向导里，演示用 Temporary sharing 就够了；长期使用选择 stable public access。",
     },
     {
       title: "ChatGPT 适合 Token in URL",
       body: "完整 URL 本身就是凭据，所以 ChatGPT 对话框里可以保持 No authentication。",
+    },
+    {
+      title: "复制安全 endpoint",
+      body: "启动工作区后复制公网 endpoint。这个 URL 已经携带 token。",
     },
     {
       title: "在 ChatGPT 添加 custom MCP server",
@@ -429,20 +418,11 @@ const chinese: Copy = {
 
 const sceneVisuals = [
   {
-    image: "dashboard-running.png",
-    seconds: 5.4,
-    focus: full,
-    endFocus: { x: 835, y: 375, w: 675, h: 315 },
-    actions: [
-      { at: 3.15, x: 982, y: 640, rect: { x: 924, y: 621, w: 116, h: 38 } },
-    ],
-  },
-  {
     image: "workspace-access.png",
     seconds: 4.2,
     focus: { x: 470, y: 165, w: 625, h: 755 },
     actions: [
-      { at: 2.55, x: 780, y: 584, rect: { x: 502, y: 560, w: 565, h: 46 } },
+      { at: 2.55, x: 780, y: 424, rect: { x: 510, y: 402, w: 579, h: 45 } },
     ],
   },
   {
@@ -450,29 +430,35 @@ const sceneVisuals = [
     seconds: 4.3,
     focus: { x: 470, y: 165, w: 625, h: 755 },
     actions: [
-      { at: 2.55, x: 710, y: 675, rect: { x: 505, y: 650, w: 560, h: 42 } },
+      { at: 2.55, x: 780, y: 688, rect: { x: 512, y: 671, w: 576, h: 42 } },
+    ],
+  },
+  {
+    image: "dashboard-running.png",
+    seconds: 5.4,
+    focus: { x: 835, y: 375, w: 675, h: 315 },
+    actions: [
+      { at: 3.15, x: 1000, y: 653, rect: { x: 938, y: 631, w: 126, h: 43 } },
     ],
   },
   {
     image: "chatgpt-add-menu.png",
     seconds: 4.4,
-    focus: full,
-    endFocus: { x: 1305, y: 75, w: 270, h: 190 },
+    focus: { x: 1305, y: 75, w: 270, h: 190 },
     actions: [
-      { at: 2.7, x: 1452, y: 228, rect: { x: 1360, y: 209, w: 185, h: 35 } },
+      { at: 2.7, x: 1452, y: 231, rect: { x: 1352, y: 213, w: 224, h: 40 } },
     ],
   },
   {
     image: "chatgpt-dialog-filled.png",
     seconds: 7.4,
-    focus: { x: 480, y: 190, w: 610, h: 670 },
-    endFocus: { x: 480, y: 345, w: 610, h: 670 },
+    focus: { x: 480, y: 345, w: 610, h: 670 },
     stateImage: { at: 4.9, image: "chatgpt-dialog-confirmed.png" },
     actions: [
-      { at: 1.7, x: 780, y: 516, rect: { x: 510, y: 497, w: 548, h: 41 } },
-      { at: 3.05, x: 780, y: 592, rect: { x: 510, y: 574, w: 548, h: 38 } },
-      { at: 4.55, x: 536, y: 749, rect: { x: 515, y: 692, w: 540, h: 91 } },
-      { at: 6.25, x: 1000, y: 830, rect: { x: 926, y: 811, w: 155, h: 39 } },
+      { at: 1.7, x: 780, y: 526, rect: { x: 518, y: 506, w: 562, h: 42 } },
+      { at: 3.05, x: 780, y: 602, rect: { x: 518, y: 582, w: 562, h: 42 } },
+      { at: 4.55, x: 545, y: 746, rect: { x: 534, y: 735, w: 22, h: 22 } },
+      { at: 6.25, x: 1002, y: 831, rect: { x: 925, y: 810, w: 156, h: 43 } },
     ],
   },
   {

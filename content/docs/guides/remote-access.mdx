@@ -11,6 +11,8 @@ proxy.
 
 Before using `--auto-install-tunnel` on macOS, install `cloudflared` manually unless Homebrew is already available; the script's direct-download fallback does not handle Cloudflare's macOS `.tgz` package.
 
+Install [`uv`](https://docs.astral.sh/uv/getting-started/installation/) first when possible. Without `uv`, the installer falls back to `pip install --user`; externally managed Python installations can reject that fallback before the tunnel starts.
+
 ## One-command bearer tunnel
 
 ```bash

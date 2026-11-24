@@ -204,6 +204,8 @@ http://127.0.0.1:8765/mcp
 
 在 macOS 上使用 `--auto-install-tunnel` 前，如果系统里没有 Homebrew，请先手动安装 `cloudflared`；脚本的直接下载 fallback 不能处理 Cloudflare 的 macOS `.tgz` 包。
 
+建议先安装 [`uv`](https://docs.astral.sh/uv/getting-started/installation/)。没有 `uv` 时，安装脚本会 fallback 到 `pip install --user`；externally managed Python 可能拒绝这种安装，导致 tunnel 无法启动。
+
 ```bash
 curl -fsSL https://raw.githubusercontent.com/xyTom/coding-tools-mcp/main/scripts/install.sh \
   | bash -s -- --tunnel cloudflared --auto-install-tunnel --auth-mode bearer --workspace /path/to/repo

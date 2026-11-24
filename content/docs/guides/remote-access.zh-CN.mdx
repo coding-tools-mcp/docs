@@ -7,6 +7,8 @@ description: 通过 HTTPS 安全发布本地 Coding Tools MCP server。
 
 在 macOS 上使用 `--auto-install-tunnel` 前，如果系统里没有 Homebrew，请先手动安装 `cloudflared`；脚本的直接下载 fallback 不能处理 Cloudflare 的 macOS `.tgz` 包。
 
+建议先安装 [`uv`](https://docs.astral.sh/uv/getting-started/installation/)。没有 `uv` 时，安装脚本会 fallback 到 `pip install --user`；externally managed Python 可能拒绝这种安装，导致 tunnel 无法启动。
+
 ## 一条命令启动 bearer tunnel
 
 ```bash

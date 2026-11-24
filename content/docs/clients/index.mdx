@@ -204,6 +204,8 @@ For remote MCP clients, keep the server on loopback and expose it through an HTT
 
 Before using `--auto-install-tunnel` on macOS, install `cloudflared` manually unless Homebrew is already available; the script's direct-download fallback does not handle Cloudflare's macOS `.tgz` package.
 
+Install [`uv`](https://docs.astral.sh/uv/getting-started/installation/) first when possible. Without `uv`, the installer falls back to `pip install --user`; externally managed Python installations can reject that fallback before the tunnel starts.
+
 ```bash
 curl -fsSL https://raw.githubusercontent.com/xyTom/coding-tools-mcp/main/scripts/install.sh \
   | bash -s -- --tunnel cloudflared --auto-install-tunnel --auth-mode bearer --workspace /path/to/repo

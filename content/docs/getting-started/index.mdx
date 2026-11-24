@@ -151,7 +151,7 @@ Install and expose an authenticated bearer-token Cloudflare tunnel:
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/xyTom/coding-tools-mcp/main/scripts/install.sh \
-  | bash -s -- --tunnel cloudflared --auto-install-tunnel --workspace /path/to/repo
+  | bash -s -- --tunnel cloudflared --auto-install-tunnel --auth-mode bearer --workspace /path/to/repo
 ```
 
 Do not expose HTTP publicly without authentication. See [Remote access](/guides/remote-access).

@@ -200,7 +200,9 @@ This endpoint is designed for local loopback use. Do not bind it to a public int
 
 ## Remote MCP and cloud clients
 
-For remote MCP clients, keep the server on loopback and expose it through an HTTPS tunnel with authentication. The fixed tool set includes mutation and command execution, so a public endpoint must never be unauthenticated:
+For remote MCP clients, keep the server on loopback and expose it through an HTTPS tunnel with authentication. The fixed tool set includes mutation and command execution, so a public endpoint must never be unauthenticated.
+
+Before using `--auto-install-tunnel` on macOS, install `cloudflared` manually unless Homebrew is already available; the script's direct-download fallback does not handle Cloudflare's macOS `.tgz` package.
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/xyTom/coding-tools-mcp/main/scripts/install.sh \

@@ -200,7 +200,9 @@ http://127.0.0.1:8765/mcp
 
 ## Remote MCP 与云客户端
 
-远程客户端应继续让 server 只监听 loopback，再通过带认证的 HTTPS 隧道暴露。固定 tool set 包含文件修改与命令执行，因此公网 endpoint 绝不能无认证：
+远程客户端应继续让 server 只监听 loopback，再通过带认证的 HTTPS 隧道暴露。固定 tool set 包含文件修改与命令执行，因此公网 endpoint 绝不能无认证。
+
+在 macOS 上使用 `--auto-install-tunnel` 前，如果系统里没有 Homebrew，请先手动安装 `cloudflared`；脚本的直接下载 fallback 不能处理 Cloudflare 的 macOS `.tgz` 包。
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/xyTom/coding-tools-mcp/main/scripts/install.sh \

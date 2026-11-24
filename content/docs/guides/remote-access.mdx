@@ -9,6 +9,8 @@ and publish it through an HTTPS tunnel. The fixed tool set includes
 public deployment must use bearer auth, OAuth, or an external authenticated
 proxy.
 
+Before using `--auto-install-tunnel` on macOS, install `cloudflared` manually unless Homebrew is already available; the script's direct-download fallback does not handle Cloudflare's macOS `.tgz` package.
+
 ## One-command bearer tunnel
 
 ```bash

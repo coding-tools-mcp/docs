@@ -5,6 +5,8 @@ description: 通过 HTTPS 安全发布本地 Coding Tools MCP server。
 
 `coding-tools-mcp` 在 `/mcp` 暴露 Streamable HTTP。建议始终只监听 loopback，再通过 HTTPS 隧道发布。固定 tool set 中包含 `apply_patch` 和 `exec_command`，不存在一个自动缩减的“只读工具集”，因此任何公网部署都必须使用 bearer auth、OAuth，或外部 authenticated proxy。
 
+在 macOS 上使用 `--auto-install-tunnel` 前，如果系统里没有 Homebrew，请先手动安装 `cloudflared`；脚本的直接下载 fallback 不能处理 Cloudflare 的 macOS `.tgz` 包。
+
 ## 一条命令启动 bearer tunnel
 
 ```bash

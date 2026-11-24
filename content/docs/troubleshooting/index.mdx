@@ -1,23 +1,162 @@
 ---
 title: Troubleshooting
-description: Diagnose protocol, transport, sandbox, and runtime problems.
+description: Diagnose client, transport, authentication, protocol, sandbox, and runtime problems by layer.
 ---
 
-## Protocol Version Errors
+Do not paste real tokens, complete `Authorization` headers, `.env` files, private keys, or unreviewed traces into issues, chats, screenshots, or logs. Redact secrets before sharing diagnostics.
 
-Send `MCP-Protocol-Version` on every HTTP request. A `2026-07-28` client sends
-`MCP-Protocol-Version: 2026-07-28`, repeating the version in its
-`params._meta`; a header that disagrees with the body, or is missing from such
-a request, returns `400` with `-32020`. A handshake client sends the version it
-negotiated at initialization, normally `MCP-Protocol-Version: 2025-11-25`, or
-`2025-06-18` for compatibility. A header naming a version this server does not
-know returns `400` with `-32600` and lists the ones it does; a request with no
-header at all is read as `2025-11-25`.
+## Identify the failing layer first
 
-Asking to handshake with a version this server does not speak is no longer an
-error: `initialize` answers with the newest version it does speak. If a client
-seems to be on an older protocol than expected, read the `protocolVersion` in
-the `InitializeResult` rather than assuming the one that was requested.
+Most “Coding Tools MCP does not work” reports are one of six different failures. Use the first observed signal to choose the next check instead of restarting everything.
+
+| Signal | Likely layer | Next check |
+| --- | --- | --- |
+| Client never lists the server or tools | Client configuration or process launch | Restart the client; verify the exact command/path; check whether the client supports MCP |
+| `uvx`, `npx`, or `coding-tools-mcp` is not found | Local toolchain or GUI `PATH` | Run the command in a terminal; use the absolute executable path in the client |
+| Local HTTP URL refuses the connection | Server not running or wrong port | Start the server and check `http://127.0.0.1:8765/mcp` on the same machine |
+| Tunnel URL does not answer or answers at the wrong site | Public network / tunnel / reverse proxy | Check tunnel status and public discovery before changing workspace settings |
+| HTTP 401/403 or an OAuth authorization failure | Authentication | Confirm the auth method, token/password, exact URL, and client capability |
+| MCP responds but file/command calls fail | Workspace or permission/runtime policy | Inspect the exact tool error, permission mode, workspace path, and exec diagnostics |
+
+A cloud-client failure is not automatically a workspace-permission failure. If the request never reached the server, changing permission modes cannot fix it.
+
+## Five-minute isolation checklist
+
+### 1. Can the runtime start?
+
+```bash
+uvx coding-tools-mcp --help
+# or
+npx --yes coding-tools-mcp --help
+```
+
+If neither works, fix Python/uv or Node.js first. If the terminal command works but a GUI client cannot launch it, the client probably has a different `PATH`; use the absolute executable path.
+
+### 2. Does local HTTP respond?
+
+Start the server:
+
+```bash
+uvx coding-tools-mcp --workspace /path/to/repo
+```
+
+Then confirm the endpoint exists on the same machine:
+
+```bash
+curl -i http://127.0.0.1:8765/.well-known/mcp.json
+```
+
+`GET /mcp` returning `405` is expected for this Streamable HTTP implementation because it does not provide an SSE stream. Use POST for MCP requests.
+
+### 3. Does an authenticated remote endpoint respond?
+
+Replace `BASE_URL` with the HTTPS origin, without `/mcp`:
+
+```bash
+curl -i "$BASE_URL/.well-known/mcp.json"
+```
+
+For bearer mode, an unauthenticated MCP request should fail, and a correct token should reach initialization:
+
+```bash
+curl "$BASE_URL/mcp" \
+  -H "Authorization: Bearer $CODING_TOOLS_MCP_AUTH_TOKEN" \
+  -H "Accept: application/json, text/event-stream" \
+  -H "Content-Type: application/json" \
+  --data '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2025-11-25","capabilities":{},"clientInfo":{"name":"smoke","version":"1"}}}'
+```
+
+Do not put the real token directly in shell history or shared output. Use an environment variable or secret store.
+
+### 4. Is the client looking at the intended workspace?
+
+Ask:
+
+```text
+Inspect this repository and summarize its structure. Do not modify files or run commands yet.
+```
+
+If the answer describes the wrong project, stop. Fix the configured workspace path before testing writes or commands.
+
+### 5. Is public access really authenticated?
+
+For any public endpoint, test the unauthenticated case before handing the URL to a cloud client. A public no-auth MCP endpoint is unsafe because the fixed tool catalog includes file mutation and command execution.
+
+## Client cannot find the server or tools
+
+Check these in order:
+
+1. The configuration file is the one the client actually reads.
+2. The JSON/TOML is valid and uses the correct server name.
+3. `/path/to/repo` is an absolute path to the intended workspace.
+4. The client was fully restarted or reloaded.
+5. `uvx`/`npx` works from a terminal.
+6. If the client was launched from a GUI, use absolute executable paths.
+
+The server name does not usually need to be `coding-tools`, but avoid underscores in Gemini CLI because it derives tool names from the server name and splits on the first underscore.
+
+## GUI client says `uvx` or `npx` is not found
+
+This is usually not a Coding Tools MCP crash. Desktop apps often inherit a minimal system `PATH`, not your interactive shell `PATH`.
+
+Use the absolute path, for example:
+
+```json
+{
+  "command": "/opt/homebrew/bin/uvx",
+  "args": ["coding-tools-mcp", "--stdio", "--workspace", "/path/to/repo"]
+}
+```
+
+Find the path with:
+
+```bash
+which uvx
+which npx
+```
+
+On Windows, use the full path to the `.exe` or the launcher appropriate for your installation.
+
+## Local server starts but the client cannot connect
+
+Confirm that both sides use the same transport:
+
+- stdio clients launch a command; they do not connect to `http://127.0.0.1:8765/mcp`.
+- HTTP clients connect to a URL; they do not launch the stdio command themselves unless the client documentation says so.
+- `GET /mcp` is expected to return `405`; use POST for MCP JSON-RPC requests.
+- There are no HTTP sessions. `Mcp-Session-Id` from older servers is ignored, and `DELETE /mcp` returns `405` because there is no session to terminate.
+
+## Tunnel or public endpoint fails
+
+Separate these checks:
+
+1. **Local service:** does loopback HTTP respond on the runtime machine?
+2. **Tunnel process:** is cloudflared/ngrok/devtunnel/Desktop public access running?
+3. **Public route:** does the HTTPS hostname reach the intended local service?
+4. **Authentication:** does the client send the right credential in the right place?
+5. **MCP client capability:** can the client set headers, complete OAuth, or only accept one URL?
+
+A temporary Cloudflare Quick Tunnel changes its hostname when restarted. If a client suddenly fails after a restart, compare the configured hostname with the current one. For a stable hostname, use a named tunnel or another stable reverse proxy.
+
+## Authentication failures
+
+Match the method to the client:
+
+| Method | Common failure |
+| --- | --- |
+| Bearer token | Client cannot set `Authorization` headers, or the token is missing/extra-whitespace/incorrect |
+| Token in URL | Only part of the URL was copied; the complete URL was rotated; the secret leaked into logs and was revoked |
+| Basic auth | Client expects OAuth instead, or username/password were transposed |
+| OAuth | Redirect URI mismatch, process-local registration lost after restart, wrong public origin, or client does not support MCP OAuth discovery |
+| No authentication | Safe only for loopback; never a fix for a public endpoint |
+
+Do not paste a Token-in-URL endpoint into a chat to “test” it. The complete URL is a credential.
+
+## Protocol version errors
+
+Send `MCP-Protocol-Version` on every HTTP request. A `2026-07-28` client sends `MCP-Protocol-Version: 2026-07-28`, repeating the version in its `params._meta`; a header that disagrees with the body, or is missing from such a request, returns `400` with `-32020`. A handshake client sends the version it negotiated at initialization, normally `MCP-Protocol-Version: 2025-11-25`, or `2025-06-18` for compatibility. A header naming a version this server does not know returns `400` with `-32600` and lists the ones it does; a request with no header at all is read as `2025-11-25`.
+
+Asking to handshake with a version this server does not speak is no longer an error: `initialize` answers with the newest version it does speak. If a client seems to be on an older protocol than expected, read the `protocolVersion` in the `InitializeResult` rather than assuming the one that was requested.
 
 ## SANDBOX_UNAVAILABLE
 
@@ -25,29 +164,31 @@ If `exec_command` returns a warning about Linux Landlock being unavailable, the 
 
 If an older client or server reports `SANDBOX_UNAVAILABLE` as an error, upgrade to the current behavior or run on a Landlock-capable Linux kernel.
 
-## Command Hangs Or Times Out
+## Command hangs or times out
 
 If the result returns `status: "running"`, poll with `write_stdin` using empty `chars`, or terminate with `kill_command`. Command deadlines still apply when the client stops polling.
 
-## Permission Elicitation Is Unsupported
+## Permission elicitation is unsupported
 
 If `request_permissions` returns `ELICITATION_UNSUPPORTED`, the MCP client cannot show approval prompts. For dependency downloads and local development, prefer `--permission-mode trusted`; it allows network-looking commands, shell expansion, and inline scripts while keeping secret filtering and destructive-command checks. For isolated containers or VMs, use `--permission-mode dangerous` to disable `exec_command` permission gates.
 
-## Missing Toolchain Environment
+Do not use `dangerous` merely because a client prompts too often. Client-side annotation gates are client behavior; changing server permission mode cannot rewrite that behavior.
 
-`exec_command` defaults to a core shell environment. If tools such as MSVC, CUDA, oneAPI, or Nix depend on variables from the parent terminal, start the server with:
+## Missing toolchain environment
+
+`exec_command` defaults to a core shell environment. If tools such as MSVC, CUDA, oneAPI, Nix, nvm, pyenv, rbenv, or asdf depend on variables from the parent terminal, start the server with:
 
 ```bash
 CODING_TOOLS_MCP_SHELL_ENV_INHERIT=all coding-tools-mcp --workspace /path/to/repo
 ```
 
-This still filters secret-looking and loader/startup variables unless `--permission-mode dangerous` is also enabled.
+This still filters secret-looking and loader/startup variables unless `--permission-mode dangerous` is also enabled. If the problem is only a wrong binary version, prefer fixing the server launch `PATH` or using absolute toolchain paths instead of broad inheritance. See [Exec command troubleshooting](/troubleshooting/execution#wrong-toolchain-version-nvm-pyenv-rbenv-asdf).
 
-## Exec Diagnostics
+## Exec diagnostics
 
 `exec_command` may include `diagnostics` with codes such as `DEV_NULL_DENIED`, `DNS_RESOLUTION_FAILED`, `NETWORK_PERMISSION_REQUIRED`, `TMPDIR_NOT_WRITABLE`, `HOME_NOT_WRITABLE`, `COMMAND_TIMED_OUT`, and `OUTPUT_TRUNCATED`. See [Exec command troubleshooting](/troubleshooting/execution).
 
-## Trace Tool Calls
+## Trace tool calls
 
 For local debugging:
 
@@ -55,7 +196,32 @@ For local debugging:
 CODING_TOOLS_MCP_TRACE=1 coding-tools-mcp --workspace /path/to/repo
 ```
 
-Trace events are JSON lines on stderr. Arguments are redacted for secret-looking keys and values; stdout remains reserved for stdio JSON-RPC frames.
+Trace events are JSON lines on stderr. Arguments are redacted for secret-looking keys and values; stdout remains reserved for stdio JSON-RPC frames. Review traces before sharing them because tool payloads can still contain source text, commands, or user-provided secrets.
+
+## Desktop app diagnostics
+
+The Desktop app separates local service health, public access health, runtime logs, tunnel logs, and exported diagnostics. Use **Diagnostics → Run checks** first, then **Export diagnostics** for a redacted report.
+
+When interpreting Desktop status:
+
+- **Local service ready** does not prove a public client connected.
+- **Tunnel connected** does not prove authentication or a successful MCP call.
+- **Tool history unavailable** is expected with the published Core 0.5.0 because that core does not expose an event journal; tools can still run normally.
+- A failed tunnel can leave the local service running; do not delete or recreate the workspace before reading the error.
+
+## What to include in a bug report
+
+Include only safe, relevant evidence:
+
+- exact error text and approximate time;
+- client name/version and operating system;
+- whether you used stdio, loopback HTTP, Desktop temporary sharing, stable public access, or a direct tunnel;
+- the command or configuration shape with secrets removed;
+- whether loopback worked;
+- whether an unauthenticated public request failed as expected;
+- relevant redacted diagnostics or trace lines.
+
+Never include bearer tokens, complete `?token=` URLs, OAuth secrets, private keys, `.env` contents, or unreviewed command output.
 
 ## SWE-bench
 

@@ -1,0 +1,166 @@
+---
+title: Choose your setup
+description: Pick the right local, desktop, cloud, tunnel, authentication, and sandbox combination before configuring a client.
+---
+
+Most setup mistakes come from mixing three independent decisions:
+
+1. **Where the runtime runs** — your workstation, a desktop-managed local process, a server, a container, or a VM.
+2. **How the client reaches it** — stdio, loopback HTTP, or an HTTPS tunnel/reverse proxy.
+3. **How access is controlled** — no public exposure, bearer token, URL token, Basic auth, OAuth, workspace permission mode, and an external sandbox.
+
+A tunnel is only a network path. Authentication is only an access check. Neither one is a sandbox, and neither one makes untrusted code safe to execute.
+
+## The shape of every setup
+
+```text
+AI client
+  │
+  ├─ stdio: launches the runtime directly
+  │
+  └─ HTTP: connects to /mcp
+       │
+       ├─ loopback only: http://127.0.0.1:8765/mcp
+       │
+       └─ authenticated HTTPS tunnel or reverse proxy
+            │
+            v
+     Coding Tools MCP
+            │
+            v
+       one workspace
+```
+
+Coding Tools MCP always centers on one configured workspace. The fixed tool catalog includes file mutation and command execution, so exposure and permission choices matter from the first run.
+
+## Pick the row that matches your goal
+
+| Goal | Recommended setup | Why | Watch out for |
+| --- | --- | --- | --- |
+| Use a local coding client on my own repository | stdio from Claude Desktop, Claude Code, Codex, Cursor, Windsurf, or Gemini CLI | Simplest path; no port, tunnel, or public credential | Use the correct absolute workspace path; restart the client after editing config |
+| Test the server manually or connect a local HTTP-only tool | Streamable HTTP bound to loopback | One stable local URL: `http://127.0.0.1:8765/mcp` | Do not bind it to a public interface without authentication and sandboxing |
+| Avoid the terminal entirely | [Desktop app](/desktop) | GUI for workspace creation, Core installation, service state, credentials, tunnels, and diagnostics | Desktop still exposes real file and command tools; choose the workspace carefully |
+| Use ChatGPT or another cloud client once or for a demo | Desktop temporary sharing, or the one-command authenticated tunnel | Cloud clients cannot reach `127.0.0.1`; HTTPS is required | Treat any URL containing `?token=` as a secret; temporary addresses change after restart |
+| Use a cloud client every day | Stable public address plus OAuth or another strong authentication method | Stable URL and a clearer sign-in flow | OAuth dynamic registrations are process-local in the current core; restart behavior matters |
+| Share with a teammate | A deliberately operated HTTPS deployment, not a casually copied personal token | The operator can control exposure, logs, rotation, and revocation | A shared token means everyone using it has the same effective access |
+| Evaluate untrusted code or a suspicious pull request | [Docker sandbox](/guides/docker-sandbox) or a VM | The workspace may execute attacker-controlled code | `safe` mode and Landlock are not a complete OS sandbox on every platform |
+| Build Coding Tools MCP into my own agent | [Embedding guide](/guides/embedding) | Speak MCP directly and reuse the tested tool boundary | Keep runtime contract details anchored in the core repository |
+
+## Which transport should I use?
+
+### stdio: best for local clients
+
+Use stdio when the client can launch local commands. The client starts the runtime and communicates over standard input/output.
+
+Advantages:
+
+- no port selection;
+- no tunnel;
+- no public credential;
+- the server lifetime follows the client.
+
+Typical configuration:
+
+```json
+{
+  "command": "uvx",
+  "args": ["coding-tools-mcp", "--stdio", "--workspace", "/path/to/repo"]
+}
+```
+
+If the client was launched from a graphical desktop environment, it may not inherit your terminal `PATH`. When `uvx` works in a terminal but not in the client, use the absolute path to `uvx`, `npx`, or the installed `coding-tools-mcp` executable.
+
+### Loopback HTTP: best for local URL-based tools
+
+Use HTTP when the client expects a server URL and runs on the same computer:
+
+```bash
+uvx coding-tools-mcp --workspace /path/to/repo
+```
+
+Endpoint:
+
+```text
+http://127.0.0.1:8765/mcp
+```
+
+This is still local-only because the server binds to loopback. It is not automatically available to ChatGPT, a phone, another computer, or a browser running in the cloud.
+
+### HTTPS tunnel or reverse proxy: required for cloud clients
+
+ChatGPT, Grok, claude.ai, mobile browsers, and agents hosted elsewhere cannot reach your loopback address. Use one of these instead:
+
+- the [Desktop app](/desktop) with temporary or stable public access;
+- the [authenticated tunnel script](/guides/remote-access);
+- your own reverse proxy in front of a loopback server.
+
+Every public deployment needs authentication because the tool catalog includes mutation and command execution. Never publish a no-auth server.
+
+## Which authentication method should I use?
+
+| Method | Best for | Secret handling |
+| --- | --- | --- |
+| Bearer token | Clients that support custom `Authorization` headers | Send as `Authorization: Bearer <token>`; rotate if exposed |
+| Token in URL | Clients that only accept one URL, including many simple connector forms | The complete URL is the secret; do not paste it into issues, screenshots, or logs |
+| Username and password | Clients with a Basic-auth username/password flow | Use a generated password; do not reuse an account password |
+| OAuth browser sign-in | Clients that support MCP OAuth discovery and you have a stable HTTPS origin | Uses authorization flow rather than copying a static bearer header into the client |
+| No authentication | Loopback-only local use | Never use for a public endpoint |
+
+The exact methods available depend on whether you run the core directly or use the Desktop app. Desktop can provide URL-token and Basic-auth compatibility in front of the core; see [Desktop app](/desktop).
+
+## Which permission mode should I use?
+
+| Mode | Use when | Important limitation |
+| --- | --- | --- |
+| `safe` | Default daily use | Not read-only; file edits and vetted commands are allowed |
+| `trusted` | Local development on code you trust, especially dependency installation and normal shell usage | Still not a sandbox; secret filtering and destructive-command checks remain important |
+| `dangerous` | Disposable container or VM where the client cannot approve prompts | Disables command permission gates and Landlock; never use as a convenience on a real workstation workspace |
+
+For untrusted repositories, choose the outer isolation first — container, VM, or disposable machine — then choose the permission mode. Do not use `dangerous` merely to make prompts disappear.
+
+## A safe first acceptance test
+
+After any setup path, verify in this order:
+
+1. **Runtime responds** — the client sees the Coding Tools MCP server or tools.
+2. **Workspace is correct** — ask the client to inspect the repository structure without changing files.
+3. **Write path is intentional** — ask for one small reviewable change and inspect `git diff` yourself.
+4. **Public access is authenticated** — for a tunnel, confirm an unauthenticated request fails before giving the URL to a client.
+5. **Secrets are not exposed** — check that tokens, `.env` files, private keys, browser cookies, and cloud credentials are outside the workspace or otherwise protected.
+
+Example first prompt:
+
+```text
+Inspect this repository and summarize its structure. Do not modify files or run commands yet.
+```
+
+Example second prompt:
+
+```text
+Find one small issue, fix it, run the narrowest relevant check, and show me the diff before committing anything.
+```
+
+## Common misconceptions
+
+### “The tunnel is secure, so the code is sandboxed.”
+
+No. A tunnel provides network reachability and TLS. Authentication decides who may connect. Sandboxing decides what code can do after it starts running. These are separate layers.
+
+### “Safe mode means read-only.”
+
+No. Safe mode is the default policy-gated mode, not a read-only product profile. File mutation is expected. If you need stronger command-write isolation, read the core documentation for workspace mutation policy before relying on it.
+
+### “A public URL is fine because nobody can guess it.”
+
+No. An unguessable URL is still a bearer secret if it contains a token, and it is not a replacement for authentication when it does not. Treat connector URLs as credentials.
+
+### “ChatGPT cannot connect, so the workspace permission mode must be wrong.”
+
+Usually not. First determine whether the request reached the server at all. Client connector configuration, public reachability, authentication, server runtime, and workspace permissions are different layers. Use [Troubleshooting](/troubleshooting).
+
+## Recommended paths
+
+- **New local user:** [Quickstart](/getting-started) → stdio client → read-only verification → one small change.
+- **New non-terminal user:** [Desktop app](/desktop) → local workspace → verify locally → add public access only when needed.
+- **New ChatGPT user:** [Desktop app](/desktop) → temporary sharing with Token in URL → verify one real project read → consider stable access later.
+- **Untrusted-code evaluator:** [Docker sandbox](/guides/docker-sandbox) → copy the suspect code into the disposable environment → never point it at your real home directory.

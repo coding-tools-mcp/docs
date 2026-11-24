@@ -3,17 +3,35 @@ title: 桌面应用
 description: 通过原生桌面应用运行和分享 Coding Tools MCP 工作区，无需使用终端。
 ---
 
-Coding Tools MCP Desktop 是 macOS、Windows 和 Linux 的原生应用。它把官方 `coding-tools-mcp` core 包在一个图形界面里：创建工作区、选择运行时、启动和停止服务、可选地通过隧道对外暴露——全程不需要编辑配置文件。源码和原生安装包在 [coding-tools-mcp/desktop](https://github.com/coding-tools-mcp/desktop)。
+Coding Tools MCP Desktop 是 macOS、Windows 和 Linux 的原生应用。它把官方 `coding-tools-mcp` core 包在一个图形界面里：创建工作区、安装或选择 runtime、启动和停止服务、配置认证、通过隧道对外暴露，并查看诊断信息——全程不需要编辑配置文件。源码和原生安装包在 [coding-tools-mcp/desktop](https://github.com/coding-tools-mcp/desktop)。
 
 ![运行中工作区的 Dashboard](/images/desktop/dashboard-running.png)
 
+如果你想要图形化路径，尤其是要连接 ChatGPT，就使用桌面应用。如果你熟悉本机 stdio 客户端配置，可以直接使用[快速开始](/zh-CN/getting-started)。
+
+## 十分钟上手路径
+
+第一次个人使用，最短且相对安全的路径是：
+
+1. 安装 Desktop，并选择 **Install recommended Core**。
+2. 为一个测试仓库创建工作区。
+3. 先用 **Only this device** 验证本地服务。
+4. 把本地配置复制到本机 MCP 客户端；只有确实需要云客户端时再开启公网访问。
+5. 先用只读提示词验证，再让 AI 修改代码。
+
+<Callout type="warn" title="工作区就是真实访问权限">
+桌面应用只是便利化外壳，不是沙箱。工作区可能暴露所选文件夹内的文件编辑和命令执行能力。请先用测试仓库，确保密钥不在其中，并自己审查 diff。
+</Callout>
+
 ## 安装
 
-1. 从 [desktop 仓库](https://github.com/coding-tools-mcp/desktop)安装原生包，或按 README 自行构建。
+1. 从 [desktop releases](https://github.com/coding-tools-mcp/desktop/releases) 安装原生包，或按 desktop 仓库 README 自行构建。
 2. 打开 **Settings**，选择 **Install recommended Core**。内置安装器会下载私有 Python 和所选的官方 Core，无需自己安装 Python 或 uv。新建工作区向导中的 **Use existing Core** 可以跳过这一步下载。
 3. 只有需要公开分享工作区时才安装 [cloudflared](https://developers.cloudflare.com/cloudflare-one/networks/connectors/cloudflare-tunnel/downloads/)。仅本机使用的工作区不需要其他依赖。
 
 ![Settings：语言、外观、关闭到托盘、Core 安装管理](/images/desktop/settings.png)
+
+**成功的表现：** 应用能打开，Settings 显示 Core 已安装，创建工作区时没有 runtime 错误。
 
 ## 创建工作区
 
@@ -26,6 +44,8 @@ Coding Tools MCP Desktop 是 macOS、Windows 和 Linux 的原生应用。它把�
 ![New workspace 向导的文件夹步骤](/images/desktop/new-workspace.png)
 
 底部的 **Permission mode** 开关用于选择 `Safe`（默认值，更严格的执行检查——并不是只读）或 `Trusted`，后者需要你显式确认，只用于可信代码。
+
+请尽量精确选择文件夹。不要只是为了省事儿选择整个 home 目录。
 
 ### 访问方式
 
@@ -55,9 +75,18 @@ Coding Tools MCP Desktop 是 macOS、Windows 和 Linux 的原生应用。它把�
 
 **Copy endpoint** 复制可直接使用的 URL——Token in URL 模式下已经带 `?token=`。Connections 页的 **Copy config** 生成对应的客户端配置，**Show credentials** 显示已保存的凭据。`?token=` 在转发给 core 前会被剥离，不会出现在 core 日志中。任何模式下 `/.well-known/` 发现接口都保持公开。
 
+请把 connector URL、token、生成的密码和导出的配置当作密钥。不要粘贴到截图、issue、聊天或终端历史里。
+
 ## 运行与监控
 
 **Dashboard** 显示 CPU、内存、运行时长和 Core 版本，并有 **Local service** 与 **Public access** 两张独立的健康卡片，可在此启动、停止、重启工作区。
+
+请分开理解两张健康卡片：
+
+- **Local service ready** 表示 core 在本机可访问。
+- **Public access connected** 表示隧道/代理路径已启动；它本身并不证明客户端已经认证或完成 MCP 调用。
+
+其他页面：
 
 - **Connections** — 两个端点及复制按钮、**Check public address**、隧道提示和命名隧道部分。
 
@@ -71,24 +100,30 @@ Coding Tools MCP Desktop 是 macOS、Windows 和 Linux 的原生应用。它把�
 
 - **Settings** — 语言（English / 简体中文）、明暗外观、**Close to tray**（关窗后服务继续运行）以及 Core 版本安装与回滚。
 
-## 连接客户端
+## 连接本机客户端
 
 从 Dashboard 或 Connections 页复制端点或客户端配置，粘贴到 MCP 客户端中。各客户端的详细说明见[客户端配置](/zh-CN/clients)。凡是只接受 URL 的 MCP 客户端都可以用 Token in URL；下图中 MCP Inspector 通过隧道列出了工作区目录：
 
 ![MCP Inspector 连接工作区后列出目录内容](/images/desktop/inspector-list-dir.png)
 
-### ChatGPT
+对于 local-only 工作区，优先使用本机客户端和 loopback endpoint。不要只因为客户端索要 URL 就把工作区公开；许多本机客户端其实支持 stdio。
 
-ChatGPT 可以在 Plugins 页面接受自定义 MCP 服务器——免费版即可使用。需要一个公网工作区端点；**Token in URL** 认证最省事，因为 ChatGPT 的自定义服务器对话框无法设置请求头。
+## 连接 ChatGPT
+
+ChatGPT 的 Web 界面支持自定义 MCP server/connector，但具体文案和可用性取决于套餐、workspace 和灰度版本。它无法访问 `127.0.0.1`，所以需要公网工作区 endpoint。**Token in URL** 通常最省事，因为 ChatGPT 的自定义服务器对话框不一定能设置请求头。
+
+<video controls playsInline preload="metadata" poster="/images/desktop/chatgpt-tutorial-zh-poster.jpg" src="/videos/desktop-chatgpt-zh.mp4" className="w-full rounded-xl border shadow-sm" aria-label="演示如何把 ChatGPT 连接到 Coding Tools MCP Desktop 工作区的带重点标注视频" />
+
+*40 秒无配音重点演示：鼠标轨迹、点击涟漪和局部放大会标出具体控件。*
 
 1. 在桌面应用里，用 **Temporary sharing** 或 **Stable public access** 加 **Token in URL** 认证启动一个工作区，然后在 Dashboard 或 Connections 页点 **Copy endpoint**。复制到的 URL 已经包含 `?token=`。
-2. 在 ChatGPT 打开 **Plugins** 页，点 **Add**，再选 **Add custom MCP server**。
+2. 在 ChatGPT 打开 Plugins/Connectors 区域，选择 **Add**，再选 **Add custom MCP server** 或等价的自定义连接器入口。
 
    ![ChatGPT Plugins 页的 Add 菜单](/images/desktop/chatgpt-add-menu.png)
 
-3. 给服务器起个名字，把端点粘到 **Server URL**，**Authentication** 选 **No authentication**——令牌已经带在 URL 里——勾选 **I understand and want to continue**，点 **Create as a plugin**。
+3. 给服务器起个名字，把端点粘到 **Server URL**，**Authentication** 选 **No authentication**——令牌已经带在 URL 里——确认你信任这个 endpoint 后再勾选警告并创建 plugin/connector。
 
-   ![填写完成的 Add custom MCP server 对话框](/images/desktop/chatgpt-dialog-filled.png)
+   ![已确认风险、可以创建的 Add custom MCP server 对话框](/images/desktop/chatgpt-dialog-confirmed.png)
 
 4. 弹出连接卡片时点 **Connect**。之后插件出现在 **Installed** 列表里，ChatGPT 就能在对话中调用它的工具了。
 
@@ -96,4 +131,22 @@ ChatGPT 可以在 Plugins 页面接受自定义 MCP 服务器——免费版即�
 
 `?token=` 参数就是授权 ChatGPT 的凭据——把这个 URL 当作密钥保管，泄露后要换新的。**Stable public access** 的工作区也可以改用 OAuth 走浏览器登录。
 
-隧道和网络背景见[远程访问](/zh-CN/guides/remote-access)。
+## 首轮验收测试
+
+客户端连接后，不要直接开始大任务。按顺序验证：
+
+1. 问：“List the top-level files in this workspace. Do not modify files or run commands.”
+2. 确认回答与你选择的文件夹一致。
+3. 让它做一个非常小、可审查的文档或正确性修复。
+4. 自己在仓库里检查 `git status --short` 和 `git diff`。
+5. 如果使用公网访问，确认没有凭据时 endpoint 不可用。
+
+绿色的本地状态卡片不是验收测试。真正的验收是：真实客户端完成了一次真实、边界清晰的工作区操作。
+
+## 后台运行与更新
+
+启用 **Close to tray** 后，关闭窗口可以让服务继续运行。通过托盘/菜单栏图标重新打开应用、停止工作区服务或完全退出。
+
+受管理的 Core 按版本保留。可以在 Settings 中安装新版本或回滚到已安装版本。安装新 runtime 不会无缘无故中断正在运行的工作区。
+
+隧道和网络背景见[远程访问](/zh-CN/guides/remote-access)。故障排查请使用[故障排查](/zh-CN/troubleshooting)，先判断失败层是 Desktop、本地 core、隧道、认证、客户端，还是 workspace 权限。

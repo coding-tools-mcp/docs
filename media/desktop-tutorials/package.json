@@ -1,0 +1,21 @@
+{
+  "name": "coding-tools-mcp-desktop-tutorials",
+  "private": true,
+  "description": "Remotion source for annotated Coding Tools MCP Desktop tutorial videos.",
+  "scripts": {
+    "studio": "remotion studio src/index.ts",
+    "render": "npm run render:en && npm run render:zh",
+    "render:en": "remotion render src/index.ts DesktopChatgptEn ../../public/videos/desktop-chatgpt-en.mp4 --codec=h264 --pixel-format=yuv420p",
+    "render:zh": "remotion render src/index.ts DesktopChatgptZh ../../public/videos/desktop-chatgpt-zh.mp4 --codec=h264 --pixel-format=yuv420p"
+  },
+  "dependencies": {
+    "@remotion/cli": "^4.0.499",
+    "react": "^19.2.8",
+    "react-dom": "^19.2.8",
+    "remotion": "^4.0.499"
+  },
+  "devDependencies": {
+    "@types/react": "^19.2.17",
+    "typescript": "^5.8.3"
+  }
+}

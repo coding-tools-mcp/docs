@@ -1,0 +1,33 @@
+# Desktop tutorial videos
+
+Programmatic click-through tutorials rendered with [Remotion](https://www.remotion.dev/).
+
+The videos are intentionally rendered from known screenshots plus explicit cursor, click, zoom, and caption keyframes. This is easier to maintain than a raw screen recording: every click target is visible, the cursor path is deterministic, captions can be localized, and outdated steps can be re-rendered after replacing a screenshot.
+
+## Render
+
+```bash
+npm install
+npm run render
+```
+
+Outputs:
+
+- `../../public/videos/desktop-chatgpt-en.mp4`
+- `../../public/videos/desktop-chatgpt-zh.mp4`
+
+Refresh the localized poster frames after rendering when the intro card changes:
+
+```bash
+ffmpeg -ss 0.6 -i ../../public/videos/desktop-chatgpt-en.mp4 -frames:v 1 -q:v 3 ../../public/images/desktop/chatgpt-tutorial-en-poster.jpg
+ffmpeg -ss 0.6 -i ../../public/videos/desktop-chatgpt-zh.mp4 -frames:v 1 -q:v 3 ../../public/images/desktop/chatgpt-tutorial-zh-poster.jpg
+```
+
+## Update a tutorial
+
+1. Replace or add screenshots under `public/images/`.
+2. Update scene timing, focus rectangles, cursor targets, and localized captions in `src/DesktopChatgptTutorial.tsx`.
+3. Render both language compositions and inspect the videos.
+4. Commit the Remotion source and the rendered MP4 assets used by the docs.
+
+Coordinates are in the original 1600×1090 screenshot coordinate space. Keep credential-like example URLs clearly fake when replacing screenshots.

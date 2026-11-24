@@ -3,17 +3,35 @@ title: Desktop app
 description: Run and share Coding Tools MCP workspaces from the native desktop application, without using a terminal.
 ---
 
-Coding Tools MCP Desktop is a native app for macOS, Windows, and Linux. It wraps the official `coding-tools-mcp` core in a graphical shell: you create workspaces, pick a runtime, start and stop the server, and optionally expose it through a tunnel — all without editing config files. The source and native bundles live in [coding-tools-mcp/desktop](https://github.com/coding-tools-mcp/desktop).
+Coding Tools MCP Desktop is a native app for macOS, Windows, and Linux. It wraps the official `coding-tools-mcp` core in a graphical shell: create workspaces, install or select a runtime, start and stop services, configure authentication, expose a tunnel, and inspect diagnostics without editing config files. The source and native bundles live in [coding-tools-mcp/desktop](https://github.com/coding-tools-mcp/desktop).
 
 ![The dashboard with a running workspace](/images/desktop/dashboard-running.png)
 
+Use Desktop when you want the GUI path, especially for ChatGPT. Use the [Quickstart](/getting-started) instead if you are comfortable configuring a local stdio client directly.
+
+## The ten-minute path
+
+For a first personal setup, the shortest safe path is:
+
+1. Install Desktop and choose **Install recommended Core**.
+2. Create a workspace for one test repository.
+3. Keep **Only this device** while you verify the local service.
+4. Copy the local configuration into a local MCP client, or switch to public access only when you need a cloud client.
+5. Verify with a read-only prompt before asking for changes.
+
+<Callout type="warn" title="A workspace is real access">
+Desktop is a convenience layer, not a sandbox. A workspace can expose file editing and command execution inside the selected folder. Start with a test repository, keep secrets out of it, and review diffs yourself.
+</Callout>
+
 ## Install
 
-1. Install a native bundle from the [desktop repository](https://github.com/coding-tools-mcp/desktop), or build one following its README.
+1. Install a native bundle from the [desktop releases](https://github.com/coding-tools-mcp/desktop/releases), or build one following the desktop repository README.
 2. Open **Settings** and choose **Install recommended Core**. The bundled installer downloads a private Python and the selected official Core, so you do not need Python or uv installed yourself. **Use existing Core** in the workspace wizard skips that download.
 3. Install [cloudflared](https://developers.cloudflare.com/cloudflare-one/networks/connectors/cloudflare-tunnel/downloads/) only if you plan to share a workspace publicly. Local-only workspaces need nothing else.
 
 ![Settings: language, appearance, close to tray, and managed Core installation](/images/desktop/settings.png)
+
+**Success looks like:** the app opens, Settings reports an installed Core, and no runtime error appears when you create a workspace.
 
 ## Create a workspace
 
@@ -26,6 +44,8 @@ Click **New workspace** in the sidebar. The wizard has three steps:
 ![The New workspace wizard, folder step](/images/desktop/new-workspace.png)
 
 The **Permission mode** toggle at the bottom chooses between `Safe` (the default, stricter execution checks — it is not read-only) and `Trusted`, which is an explicit opt-in for code you trust.
+
+Choose the folder narrowly. Do not select your entire home directory merely to avoid picking a project folder later.
 
 ### Access modes
 
@@ -55,9 +75,18 @@ Public access always requires one authentication method. Leave credential fields
 
 **Copy endpoint** gives you the ready-to-use URL — for Token in URL it already contains `?token=`. **Copy config** on the Connections page produces the matching client entry, and **Show credentials** reveals the saved values. The `?token=` value is stripped before requests reach the core, so it never lands in core logs. `/.well-known/` discovery stays public in every mode.
 
+Treat connector URLs, tokens, generated passwords, and exported configuration as secrets. Do not paste them into screenshots, issues, chats, or terminal history.
+
 ## Run and monitor
 
 The **Dashboard** shows CPU, memory, uptime, and the Core version, plus independent health cards for the **Local service** and **Public access**. Start, stop, and restart the workspace from here.
+
+Understand the two health cards separately:
+
+- **Local service ready** means the core is reachable on this computer.
+- **Public access connected** means the tunnel/proxy path is up; it does not by itself prove a client authenticated or completed an MCP call.
+
+Additional pages:
 
 - **Connections** — both endpoints with copy buttons, **Check public address**, tunnel notices, and the named-tunnel section.
 
@@ -71,29 +100,53 @@ The **Dashboard** shows CPU, memory, uptime, and the Core version, plus independ
 
 - **Settings** — language (English / 简体中文), light or dark appearance, **Close to tray** to keep services running when the window closes, and managed Core installs with rollback.
 
-## Connect a client
+## Connect a local client
 
 Copy the endpoint or the client configuration from the Dashboard or Connections page and paste it into your MCP client. Per-client details are in [Client configuration](/clients). Any MCP client that accepts a URL works with Token in URL; here MCP Inspector lists the workspace directory through the tunnel:
 
 ![MCP Inspector connected to the workspace, listing directory entries](/images/desktop/inspector-list-dir.png)
 
-### ChatGPT
+For a local-only workspace, prefer a local client and the loopback endpoint. Do not expose a workspace publicly merely because a client asks for a URL; many local clients support stdio instead.
 
-ChatGPT accepts a custom MCP server from its Plugins page — this works on the free tier. You need a public workspace endpoint; **Token in URL** authentication is the simplest fit because ChatGPT's custom-server dialog cannot set request headers.
+## Connect ChatGPT
 
-1. In the desktop app, start a workspace on **Temporary sharing** or **Stable public access** with **Token in URL** authentication, then click **Copy endpoint** on the Dashboard or Connections page. The copied URL already contains `?token=`.
-2. In ChatGPT, open the **Plugins** page, click **Add**, then **Add custom MCP server**.
+ChatGPT accepts custom MCP servers/connectors in its web interface, but exact labels and availability depend on your plan, workspace, and rollout. It cannot reach `127.0.0.1`; you need a public workspace endpoint. **Token in URL** authentication is usually the simplest fit because ChatGPT's custom-server dialog cannot always set request headers.
+
+<video controls playsInline preload="metadata" poster="/images/desktop/chatgpt-tutorial-en-poster.jpg" src="/videos/desktop-chatgpt-en.mp4" className="w-full rounded-xl border shadow-sm" aria-label="Annotated click-through showing how to connect ChatGPT to a Coding Tools MCP Desktop workspace" />
+
+*40-second silent click-through: cursor movement, click ripples, and zoomed focus regions show the exact controls.*
+
+1. In Desktop, start a workspace on **Temporary sharing** or **Stable public access** with **Token in URL** authentication, then click **Copy endpoint** on the Dashboard or Connections page. The copied URL already contains `?token=`.
+2. In ChatGPT, open the Plugins/Connectors area, choose **Add**, then **Add custom MCP server** or the equivalent custom connector action.
 
    ![The Add menu on the ChatGPT Plugins page](/images/desktop/chatgpt-add-menu.png)
 
-3. Give the server a name, paste the endpoint into **Server URL**, set **Authentication** to **No authentication** — the token travels inside the URL — tick **I understand and want to continue**, and click **Create as a plugin**.
+3. Give the server a name, paste the endpoint into **Server URL**, set **Authentication** to **No authentication** — the token travels inside the URL — acknowledge the warning only if you trust this endpoint, and create the plugin/connector.
 
-   ![The filled Add custom MCP server dialog](/images/desktop/chatgpt-dialog-filled.png)
+   ![The ready-to-create Add custom MCP server dialog](/images/desktop/chatgpt-dialog-confirmed.png)
 
-4. When the connect card appears, click **Connect**. ChatGPT then lists the plugin under **Installed** and calls its tools from chat.
+4. When the connect card appears, click **Connect**. ChatGPT then lists the plugin under **Installed** and can call its tools from chat.
 
    ![ChatGPT answering via the Coding Tools MCP plugin](/images/desktop/chatgpt-call-result.png)
 
 The `?token=` parameter is what authorizes ChatGPT — treat that URL as a secret and rotate it if it leaks. A workspace on **Stable public access** can instead use the OAuth flow for browser sign-in.
 
-For tunnel and network background, see [Remote access](/guides/remote-access).
+## First acceptance test
+
+After any client is connected, do not start with a large task. Verify the path in order:
+
+1. Ask: “List the top-level files in this workspace. Do not modify files or run commands.”
+2. Confirm that the answer matches the folder you selected.
+3. Ask for one tiny, reviewable documentation or correctness fix.
+4. Inspect `git status --short` and `git diff` in the repository yourself.
+5. For public access, confirm that the endpoint is not usable without its credential.
+
+A green local status card is not the acceptance test. The acceptance test is a real client completing a real, bounded workspace operation.
+
+## Background operation and updates
+
+Closing the window can keep services running when **Close to tray** is enabled. Use the tray/menu-bar icon to reopen the app, stop workspace services, or quit completely.
+
+Managed Core installs are kept per version. Use Settings to install a newer Core or roll back to a previously installed one. A running workspace is not silently interrupted just because a new runtime is installed.
+
+For tunnel and network background, see [Remote access](/guides/remote-access). For failures, use [Troubleshooting](/troubleshooting) and identify whether the failing layer is Desktop, the local core, the tunnel, authentication, the client, or workspace permissions.

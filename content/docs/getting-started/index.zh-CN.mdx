@@ -1,108 +1,178 @@
 ---
 title: 快速开始
-description: 安装 Coding Tools MCP，并连接你的第一个 MCP 客户端。
+description: 安装 Coding Tools MCP，连接第一个客户端，并验证第一条安全的端到端结果。
 ---
 
-从 PyPI 安装已发布版本：
+本页带你在十分钟左右完成第一个可用配置。默认走最安全、最容易理解的路径：本地工作区、`safe` 权限模式和本机 MCP 客户端。
+
+如果你完全不想使用终端，请直接从[桌面应用](/zh-CN/desktop)开始。如果你的客户端是 ChatGPT、Grok 或其他无法启动本地进程的云端产品，请先阅读[选择你的使用方式](/zh-CN/getting-started/choose-your-setup)，不要直接复制第一段配置。
+
+## 开始前准备
+
+你需要：
+
+- 一个你允许 AI 查看和修改的文件夹——最好是工作区干净、随时可以审查 diff 的 Git 仓库；
+- Python 3.11 或更新版本，并安装 [uv](https://docs.astral.sh/uv/)；或者安装 Node.js 并使用 `npx`；
+- 一个 MCP 客户端，例如 Claude Desktop、Claude Code、Codex、Cursor、VS Code、Windsurf 或 Gemini CLI。
+
+<Callout type="warn" title="先用测试仓库">
+Coding Tools MCP 不是只读查看器。默认工具目录可以编辑文件，也可以在配置的工作区内运行命令。第一次请使用小仓库或一次性副本，并确保密钥、令牌和私密文件不在这个文件夹里。
+</Callout>
+
+## 1. 确认 runtime 能启动
+
+Python 工具链：
+
+```bash
+uvx coding-tools-mcp --help
+```
+
+Node.js 工具链：
+
+```bash
+npx --yes coding-tools-mcp --help
+```
+
+任意一个命令都会在需要时下载发布包并打印帮助。第一次使用不需要永久安装。
+
+如果两个命令都失败，先安装或修复 uv/Python 或 Node.js。如果这里能打印帮助、但客户端之后无法启动 server，请在客户端配置中使用 `which uvx`、`which npx` 或包管理器显示的绝对路径。
+
+## 2. 选择连接形态
+
+大多数本机桌面客户端应使用 **stdio**：客户端会把 `coding-tools-mcp` 作为子进程启动。这个模式下你不需要手动启动 server。
+
+| 你的情况 | 使用方式 | 工作区暴露范围 |
+| --- | --- | --- |
+| Claude Desktop、Claude Code、Codex、Cursor、Windsurf 或 Gemini CLI 与代码在同一台电脑 | stdio | 仅该客户端进程 |
+| MCP Inspector、VS Code HTTP 模式，或本机某个只接受 URL 的客户端 | loopback 上的 Streamable HTTP | `http://127.0.0.1:8765/mcp` |
+| ChatGPT、Grok、claude.ai、手机浏览器或不在本机的客户端 | 带认证的 HTTPS 隧道 | 公网 URL；必须启用认证 |
+| 想用图形界面、不碰终端 | [桌面应用](/zh-CN/desktop) | 本机或带认证的公网访问 |
+| 正在评估不可信代码 | [Docker 沙箱](/zh-CN/guides/docker-sandbox) | 一次性容器 |
+
+更完整的决策说明见[选择你的使用方式](/zh-CN/getting-started/choose-your-setup)。
+
+## 3. 配置本机 stdio 客户端
+
+把下面这段加入 MCP 客户端配置，并将 `/path/to/repo` 替换成真实工作区路径：
+
+```json
+{
+  "mcpServers": {
+    "coding-tools": {
+      "command": "uvx",
+      "args": ["coding-tools-mcp", "--stdio", "--workspace", "/path/to/repo"]
+    }
+  }
+}
+```
+
+更喜欢 Node.js？可以通过 `npx` 使用同样参数：
+
+```json
+{
+  "mcpServers": {
+    "coding-tools": {
+      "command": "npx",
+      "args": ["--yes", "coding-tools-mcp", "--stdio", "--workspace", "/path/to/repo"]
+    }
+  }
+}
+```
+
+保存后重启或重新加载客户端。各客户端的配置文件位置和替代写法见[客户端配置](/zh-CN/clients)。
+
+## 4. 用只读请求验证
+
+向已连接的客户端发送：
+
+```text
+Inspect this repository and summarize its structure. Do not modify files or run commands yet.
+```
+
+也可以直接发送中文：
+
+```text
+检查这个仓库并总结它的结构。暂时不要修改文件，也不要运行命令。
+```
+
+成功的回答证明整条链路已经打通：客户端 → MCP transport → Coding Tools MCP → 工作区文件。如果客户端提示 server 或 tools 不可用，请进入[故障排查](/zh-CN/troubleshooting)，不要随意修改工作区或权限设置。
+
+## 5. 尝试一个小而可审查的修改
+
+只读请求成功后，再发送一个边界清晰的任务：
+
+```text
+Find one small correctness or documentation issue in this repository, fix it,
+run the narrowest relevant check, and show me the diff before committing anything.
+```
+
+中文示例：
+
+```text
+在这个仓库里找一个小的正确性或文档问题并修复它，运行范围最小的相关检查，
+在提交任何东西之前先向我展示 diff。
+```
+
+然后自己检查结果：
+
+```bash
+git status --short
+git diff
+```
+
+第一个任务应该小到你能逐行审查。是否接受、回退或提交修改，最终仍由你决定。
+
+## 6. 理解默认权限
+
+默认模式是 `safe`。它**不是**只读模式：编辑文件本来就是产品能力，命令也会在 server-side policy check 下运行。看起来需要网络的命令、shell expansion、inline script、破坏性命令以及像密钥的环境变量会受到额外限制。
+
+只在你信任的本地开发代码上使用 `trusted`：
+
+```bash
+coding-tools-mcp --permission-mode trusted --workspace /path/to/repo
+```
+
+只有在隔离容器或 VM 中、并且客户端无法展示权限确认时，才使用 `dangerous`：
+
+```bash
+coding-tools-mcp --permission-mode dangerous --workspace /path/to/repo
+```
+
+完整安全模型以核心仓库为准：先阅读 [security boundary](https://github.com/xyTom/coding-tools-mcp/blob/main/docs/security-boundary.md) 和 [permission modes](https://github.com/xyTom/coding-tools-mcp/blob/main/docs/permission-modes.md)。
+
+## 可选：永久安装与 HTTP
+
+从 PyPI 安装已发布命令：
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/xyTom/coding-tools-mcp/main/scripts/install.sh | bash
 ```
 
-安装并针对指定工作区启动本地 Streamable HTTP：
+针对一个工作区启动本地 Streamable HTTP：
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/xyTom/coding-tools-mcp/main/scripts/install.sh \
-  | bash -s -- --start --workspace /path/to/repo
+uvx coding-tools-mcp --workspace /path/to/repo
 ```
 
-安装并通过带 bearer token 认证的隧道暴露服务：
+Endpoint：
+
+```text
+http://127.0.0.1:8765/mcp
+```
+
+安装并通过带 bearer token 认证的 Cloudflare 隧道暴露服务：
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/xyTom/coding-tools-mcp/main/scripts/install.sh \
   | bash -s -- --tunnel cloudflared --auto-install-tunnel --workspace /path/to/repo
 ```
 
-如果你已经 clone 了源码仓库，也可以直接运行：
+不要在没有认证的情况下把 HTTP 服务暴露到公网。详见[远程访问](/zh-CN/guides/remote-access)。
 
-```bash
-scripts/install.sh
-```
+## 接下来读什么
 
-无需永久安装，直接运行已发布 package：
-
-```bash
-uvx coding-tools-mcp --workspace .
-```
-
-给支持 stdio 的 MCP 客户端使用：
-
-```bash
-uvx coding-tools-mcp --stdio --workspace /path/to/repo
-```
-
-如果你是从源码 checkout 开发，而不是使用发布包，可以启动 Streamable HTTP：
-
-```bash
-make start
-```
-
-默认 endpoint：
-
-```text
-http://127.0.0.1:8765/mcp
-```
-
-通过 Make 变量指定不同工作区、host、port 或额外 server 参数：
-
-```bash
-make start MCP_WORKSPACE=/path/to/repo MCP_PORT=8000 MCP_ARGS="--permission-mode trusted"
-```
-
-如果依赖尚未安装，以 editable 模式安装开发环境：
-
-```bash
-python -m pip install -e ".[dev]"
-```
-
-直接启动 stdio：
-
-```bash
-coding-tools-mcp --stdio --workspace /path/to/repo
-```
-
-运行项目 acceptance gate：
-
-```bash
-make compliance
-```
-
-本地需要 trace 调试时：
-
-```bash
-CODING_TOOLS_MCP_TRACE=1 coding-tools-mcp --workspace /path/to/repo
-```
-
-Trace 会以 JSON Lines 写入 stderr。
-
-如果某些工具链必须继承 shell 环境变量，可以放宽 shell environment policy：
-
-```bash
-CODING_TOOLS_MCP_SHELL_ENV_INHERIT=all coding-tools-mcp --workspace /path/to/repo
-```
-
-本地开发如果需要下载依赖、shell expansion 或 inline interpreter snippet，使用 trusted mode：
-
-```bash
-coding-tools-mcp --permission-mode trusted --workspace /path/to/repo
-```
-
-如果你只是希望兼容旧配置、放开“看起来需要网络”的命令 gate，`--allow-network` 仍保留为兼容参数。
-
-如果 MCP 客户端无法显示权限确认，而且你**明确**想在隔离的容器或 VM 中关闭 `exec_command` 权限 gate：
-
-```bash
-coding-tools-mcp --permission-mode dangerous --workspace /path/to/repo
-```
-
-只在可信工作区、可信客户端以及已经由外部环境完成隔离的场景中使用 dangerous mode。`--dangerously-skip-all-permissions` 仍作为兼容 alias 保留。
+- [选择你的使用方式](/zh-CN/getting-started/choose-your-setup) — 理解本地、云端、隧道、认证和沙箱选择。
+- [桌面应用](/zh-CN/desktop) — 适合非终端用户和 ChatGPT 的图形化路径。
+- [客户端配置](/zh-CN/clients) — 每个 MCP 客户端的准确配置。
+- [Exec command 示例](/zh-CN/guides/exec-command-recipes) — 常见命令执行模式。
+- [故障排查](/zh-CN/troubleshooting) — 按层定位问题，而不是盲目尝试。

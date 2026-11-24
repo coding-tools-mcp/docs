@@ -1,17 +1,28 @@
 ---
 title: MCP client configuration
-description: Configure Coding Tools MCP in popular MCP clients.
+description: Configure Coding Tools MCP in popular MCP clients, with the right transport and authentication for each environment.
 ---
 
-Two protocol eras are served at once. A client that speaks `2026-07-28` needs
-no configuration and no handshake: it discovers the server with
-`server/discover` and states its version in every request. A handshake client
-uses `2025-11-25`, and `2025-06-18` remains supported for existing clients.
+The correct configuration depends first on where the client runs, not on the client's brand:
 
-## Claude Desktop
+| Client environment | Recommended connection | Authentication |
+| --- | --- | --- |
+| A desktop or CLI client on the same computer as the repository | stdio, launched by the client | Not needed beyond the local process boundary |
+| A URL-based tool on the same computer | loopback Streamable HTTP at `http://127.0.0.1:8765/mcp` | Local-only use; do not expose it publicly |
+| ChatGPT, Grok, claude.ai, mobile, or another cloud client | authenticated HTTPS tunnel or the [Desktop app](/desktop) | Bearer, Token in URL, Basic, or OAuth depending on the client |
+| A teammate's machine or a shared server | deliberately operated HTTPS deployment | Scoped credential owned by the operator |
 
-Edit `claude_desktop_config.json` — `~/Library/Application Support/Claude/` on
-macOS, `%APPDATA%\Claude\` on Windows — and restart Claude Desktop:
+If you are unsure, read [Choose your setup](/getting-started/choose-your-setup) first. Do not paste a public endpoint into a client until you know which secret authorizes it.
+
+## Protocol compatibility
+
+Two protocol eras are served at once. A client that speaks `2026-07-28` needs no configuration and no handshake: it discovers the server with `server/discover` and states its version in every request. A handshake client uses `2025-11-25`, and `2025-06-18` remains supported for existing clients.
+
+You normally do not need to configure a protocol version manually. If a client behaves as though it negotiated an older protocol, read the `protocolVersion` returned in `InitializeResult` rather than assuming the requested version was accepted.
+
+## The standard local stdio entry
+
+Most local clients use the same JSON shape. Replace `/path/to/repo` with the real workspace folder:
 
 ```json
 {
@@ -24,7 +35,44 @@ macOS, `%APPDATA%\Claude\` on Windows — and restart Claude Desktop:
 }
 ```
 
+Node.js equivalent:
+
+```json
+{
+  "mcpServers": {
+    "coding-tools": {
+      "command": "npx",
+      "args": ["--yes", "coding-tools-mcp", "--stdio", "--workspace", "/path/to/repo"]
+    }
+  }
+}
+```
+
+After editing a client configuration, restart or reload that client. GUI-launched clients often do not inherit your terminal `PATH`; if `uvx` works in a terminal but the client cannot launch it, use the absolute path reported by `which uvx` or `which npx`.
+
+## Claude Desktop
+
+Edit `claude_desktop_config.json` and restart Claude Desktop:
+
+- macOS: `~/Library/Application Support/Claude/claude_desktop_config.json`
+- Windows: `%APPDATA%\Claude\claude_desktop_config.json`
+
+```json
+{
+  "mcpServers": {
+    "coding-tools": {
+      "command": "uvx",
+      "args": ["coding-tools-mcp", "--stdio", "--workspace", "/path/to/repo"]
+    }
+  }
+}
+```
+
+If Claude Desktop was already open, fully quit and reopen it. Then ask it to inspect the repository structure without modifying files.
+
 ## Codex
+
+Add this to the Codex MCP configuration:
 
 ```toml
 [mcp_servers.coding_tools]
@@ -32,7 +80,11 @@ command = "uvx"
 args = ["coding-tools-mcp", "--stdio", "--workspace", "/path/to/repo"]
 ```
 
+Use an absolute workspace path. If you use `npx`, put `--yes` in the argument list before `coding-tools-mcp`.
+
 ## Claude Code
+
+Configuration file form:
 
 ```json
 {
@@ -45,7 +97,7 @@ args = ["coding-tools-mcp", "--stdio", "--workspace", "/path/to/repo"]
 }
 ```
 
-Or from the command line:
+Command-line form:
 
 ```bash
 claude mcp add coding-tools -- uvx coding-tools-mcp --stdio --workspace /path/to/repo
@@ -53,6 +105,8 @@ claude mcp add coding-tools -- uvx coding-tools-mcp --stdio --workspace /path/to
 
 ## Cursor
 
+Use the standard local stdio entry:
+
 ```json
 {
   "mcpServers": {
@@ -63,6 +117,8 @@ claude mcp add coding-tools -- uvx coding-tools-mcp --stdio --workspace /path/to
   }
 }
 ```
+
+Restart Cursor after changing MCP configuration. If Cursor cannot find `uvx`, configure the absolute executable path.
 
 ## VS Code
 
@@ -80,8 +136,7 @@ GitHub Copilot reads `.vscode/mcp.json` in the workspace:
 }
 ```
 
-For the local HTTP server instead, use `"type": "http"` with `"url"` and
-`"headers"` keys.
+For a local HTTP server, use `"type": "http"` with `"url"` and, when needed, `"headers"` keys. Keep the HTTP server on loopback unless you have deliberately added authentication and outer isolation.
 
 ## Windsurf
 
@@ -106,8 +161,7 @@ One command, project scope by default:
 gemini mcp add coding-tools -- uvx coding-tools-mcp --stdio --workspace /path/to/repo
 ```
 
-Or edit `~/.gemini/settings.json` (user scope) or `.gemini/settings.json`
-(project scope):
+Or edit `~/.gemini/settings.json` (user scope) or `.gemini/settings.json` (project scope):
 
 ```json
 {
@@ -126,76 +180,76 @@ For the local HTTP server, transport `http` replaces the command entirely:
 gemini mcp add --transport http coding-tools http://127.0.0.1:8765/mcp
 ```
 
-Authenticated endpoints take `--header "Authorization: Bearer <token>"`. Keep
-the server name free of underscores: Gemini CLI derives tool names from it and
-splits on the first one.
+Authenticated endpoints take `--header "Authorization: Bearer <token>"`. Keep the server name free of underscores: Gemini CLI derives tool names from it and splits on the first one.
 
-## Continue, Cursor, Cline, And Generic HTTP Clients
+## Generic local HTTP clients
 
-Configure a Streamable HTTP MCP server at:
+Start the server on loopback:
+
+```bash
+uvx coding-tools-mcp --workspace /path/to/repo
+```
+
+Configure the client with:
 
 ```text
 http://127.0.0.1:8765/mcp
 ```
 
-The server is designed for local loopback use. Do not bind it to a public interface without external authentication and sandboxing.
+This endpoint is designed for local loopback use. Do not bind it to a public interface without external authentication and sandboxing.
 
-## Remote MCP
+## Remote MCP and cloud clients
 
-For remote MCP clients, keep the server on loopback and expose it through an
-HTTPS tunnel with authentication. The fixed tool set includes mutation and
-command execution:
+For remote MCP clients, keep the server on loopback and expose it through an HTTPS tunnel with authentication. The fixed tool set includes mutation and command execution, so a public endpoint must never be unauthenticated:
 
 ```bash
 CODING_TOOLS_MCP_AUTH_MODE=bearer \
 integrations/tunnels/tunnel.sh cloudflared /path/to/repo
 ```
 
-Configure the remote MCP client with:
+Configure the remote client with:
 
 ```text
 URL: https://<tunnel-host>/mcp
 ```
 
-Static bearer-token auth is available for clients that support custom
-`Authorization` headers. OAuth-aware MCP clients can use `--oauth-mode`, which
-publishes protected-resource and authorization-server discovery plus RFC 7591
-dynamic registration and a PKCE authorization flow. Clients that support
-neither require an external authenticated proxy. See [Remote access](/guides/remote-access).
+Static bearer-token auth is available for clients that support custom `Authorization` headers. OAuth-aware MCP clients can use `--oauth-mode`, which publishes protected-resource and authorization-server discovery plus RFC 7591 dynamic registration and a PKCE authorization flow. Clients that support neither require an external authenticated proxy or a Desktop-provided compatibility auth method. See [Remote access](/guides/remote-access).
 
 ## ChatGPT
 
-ChatGPT is a cloud client: it cannot launch a local process, so it needs the
-authenticated HTTPS tunnel from [Remote MCP](#remote-mcp), and its custom
-connectors offer OAuth or no authentication — there is no static bearer
-header to enter.
+ChatGPT is a cloud client: it cannot launch `uvx` or reach `127.0.0.1` on your computer. You need a public HTTPS endpoint.
+
+### Recommended for most people: Desktop app
+
+The simplest path is the [Desktop app](/desktop):
+
+1. Create a workspace with **Temporary sharing** or **Stable public access**.
+2. Choose **Token in URL** authentication.
+3. Start the workspace and click **Copy endpoint**. The copied URL already contains the secret token.
+4. In ChatGPT, add a custom MCP server/plugin, paste the URL, and select **No authentication** because the token is already in the URL.
+5. Verify with a real read-only project request.
+
+Exact ChatGPT labels vary by plan, workspace, and rollout. Treat the complete `?token=` URL as a password. Do not paste it into screenshots, issues, logs, or chat messages.
+
+### Advanced direct-core path: OAuth tunnel
+
+If you operate the core directly, start an OAuth tunnel:
 
 ```bash
 CODING_TOOLS_MCP_AUTH_MODE=oauth integrations/tunnels/tunnel.sh cloudflared /path/to/repo
 ```
 
-In ChatGPT, enable developer mode (Settings → Connectors → Advanced
-settings), then create a custom connector pointing at
-`https://<tunnel-host>/mcp`. If ChatGPT discovers the OAuth endpoints itself,
-the authorization page asks for the password the script printed. If the
-connector form asks for details instead, fill them in:
+In ChatGPT, create a custom connector or MCP app pointing at `https://<tunnel-host>/mcp`. If ChatGPT discovers the OAuth endpoints itself, the authorization page asks for the password printed by the script. If the connector form asks for details instead, fill them in:
 
 - Authorization URL: `https://<tunnel-host>/oauth/authorize`
 - Token URL: `https://<tunnel-host>/oauth/token`
-- Client ID and secret: from a pre-registered client — start the tunnel with
-  `CODING_TOOLS_MCP_OAUTH_CLIENT_ID`,
-  `CODING_TOOLS_MCP_OAUTH_CLIENT_SECRET`, and
-  `CODING_TOOLS_MCP_OAUTH_REDIRECT_URIS` set to the redirect URI ChatGPT
-  shows.
+- Client ID and secret: from a pre-registered client — start the tunnel with `CODING_TOOLS_MCP_OAUTH_CLIENT_ID`, `CODING_TOOLS_MCP_OAUTH_CLIENT_SECRET`, and `CODING_TOOLS_MCP_OAUTH_REDIRECT_URIS` set to the redirect URI ChatGPT shows.
 
 ## Grok
 
-grok.com is also cloud-only. Start the same OAuth tunnel, then add a custom
-connector at grok.com/connectors (Settings → Connectors) with
-`https://<tunnel-host>/mcp`; Grok completes the OAuth flow in a popup.
+grok.com is also cloud-only. Start the same OAuth tunnel, then add a custom connector at grok.com/connectors (Settings → Connectors) with `https://<tunnel-host>/mcp`; Grok completes the OAuth flow in a popup.
 
-The xAI API takes the static bearer tunnel instead — a request's remote MCP
-tool entry pins the server and the header:
+The xAI API takes the static bearer tunnel instead — a request's remote MCP tool entry pins the server and the header:
 
 ```json
 {
@@ -205,5 +259,22 @@ tool entry pins the server and the header:
 }
 ```
 
-Only Streamable HTTP and SSE transports are supported on Grok's side, which
-is what the tunnel already speaks.
+Only Streamable HTTP and SSE transports are supported on Grok's side, which is what the tunnel already speaks.
+
+## Verify the client before trusting it
+
+After configuration, use this acceptance sequence:
+
+1. Ask the client to list or inspect the repository without making changes.
+2. Confirm that the answer names files that really exist in the intended workspace.
+3. Ask for one small reviewable change.
+4. Inspect `git status --short` and `git diff` yourself.
+5. For a public endpoint, verify that an unauthenticated request cannot use the MCP endpoint.
+
+Good first prompt:
+
+```text
+Inspect this repository and summarize its structure. Do not modify files or run commands yet.
+```
+
+If this fails, go to [Troubleshooting](/troubleshooting) and identify the failing layer first: client configuration, process launch, loopback server, tunnel reachability, authentication, or workspace permission.
